@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import type { RootTabParamList } from '../../app/navigation/types';
 import { ScreenContainer, Card, Button, EmptyState, IconButton } from '../../components';
 import { useTheme } from '../../app/providers/ThemeProvider';
 import { ChevronLeft, ChevronRight, Plus, Utensils } from 'lucide-react-native';
@@ -17,11 +19,16 @@ interface FoodItemPreview {
 export const DiaryScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors, typography, spacing, radii } = theme;
+  const navigation = useNavigation<NavigationProp<RootTabParamList>>();
 
   const [dateIndex, setDateIndex] = useState(0); // 0 = Today
 
   const dates = ['Today, Nov 10', 'Yesterday, Nov 9', 'Sunday, Nov 8'];
   const currentDateLabel = dates[Math.abs(dateIndex) % dates.length]!;
+
+  const handleAddFood = (_mealTitle: string) => {
+    navigation.navigate('Scan');
+  };
 
   const breakfastItems: FoodItemPreview[] = [
     {
@@ -102,7 +109,7 @@ export const DiaryScreen: React.FC = () => {
           </View>
           <IconButton
             icon={<Plus size={18} color={colors.textPrimary} />}
-            onPress={() => {}}
+            onPress={() => handleAddFood(title)}
             accessibilityLabel={`Add food to ${title}`}
             variant="filled"
             size="sm"
@@ -115,7 +122,12 @@ export const DiaryScreen: React.FC = () => {
             title={`No foods logged for ${title}`}
             description="Track your meal to stay within your daily caloric target."
             action={
-              <Button title={`Log ${title}`} onPress={() => {}} variant="outline" size="sm" />
+              <Button
+                title={`Log ${title}`}
+                onPress={() => handleAddFood(title)}
+                variant="outline"
+                size="sm"
+              />
             }
           />
         ) : (

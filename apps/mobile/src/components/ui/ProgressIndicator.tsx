@@ -24,9 +24,13 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   const { theme } = useTheme();
   const { colors, typography, radii, spacing } = theme;
 
-  const validTarget = target > 0 ? target : 1;
-  const progressRatio = Math.min(Math.max(current / validTarget, 0), 1);
-  const percentage = Math.round(progressRatio * 100);
+  const safeCurrent =
+    typeof current === 'number' && Number.isFinite(current) ? Math.max(0, current) : 0;
+  const safeTarget =
+    typeof target === 'number' && Number.isFinite(target) ? Math.max(0, target) : 0;
+  const progressRatio = safeTarget > 0 ? Math.min(Math.max(safeCurrent / safeTarget, 0), 1) : 0;
+  const percentage = Number.isFinite(progressRatio) ? Math.round(progressRatio * 100) : 0;
+  const clampedPercentage = Math.min(100, Math.max(0, percentage));
 
   return (
     <View
@@ -35,9 +39,9 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       accessibilityRole="progressbar"
       accessibilityValue={{
         min: 0,
-        max: target,
-        now: current,
-        text: `${percentage}% completed`,
+        max: safeTarget,
+        now: safeCurrent,
+        text: `${clampedPercentage}% completed`,
       }}
       accessibilityLabel={label || 'Progress'}
     >
@@ -50,8 +54,8 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           )}
           {showValues ? (
             <Text style={[typography.bodySmall, { color: colors.textPrimary }]}>
-              <Text style={{ fontWeight: '600' }}>{Math.round(current)}</Text>
-              {target ? ` / ${Math.round(target)}${unit ? ' ' + unit : ''}` : ''}
+              <Text style={{ fontWeight: '600' }}>{Math.round(safeCurrent)}</Text>
+              {safeTarget > 0 ? ` / ${Math.round(safeTarget)}${unit ? ' ' + unit : ''}` : ''}
             </Text>
           ) : null}
         </View>
@@ -71,7 +75,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           style={[
             styles.fill,
             {
-              width: `${percentage}%`,
+              width: `${clampedPercentage}%`,
               backgroundColor: colors.progressFill,
               borderRadius: radii.full,
             },

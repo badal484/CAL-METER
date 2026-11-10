@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { ScreenContainer, Card, SectionHeader, Button } from '../../components';
 import { useTheme } from '../../app/providers/ThemeProvider';
 import { Camera, Barcode, FileText, Info } from 'lucide-react-native';
@@ -7,6 +7,22 @@ import { Camera, Barcode, FileText, Info } from 'lucide-react-native';
 export const ScanScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors, typography, spacing, radii } = theme;
+
+  const handleScanModePress = (title: string) => {
+    Alert.alert(
+      `${title} Preview`,
+      `${title} camera capture and AI recognition pipeline are scheduled for Milestones 4 & 7. Camera permissions are not requested in this foundation build.`,
+      [{ text: 'OK' }],
+    );
+  };
+
+  const handleManualSearchPress = () => {
+    Alert.alert(
+      'Manual Search Preview',
+      'Food database search and USDA/Open Food Facts integration will be connected in Milestone 7.',
+      [{ text: 'OK' }],
+    );
+  };
 
   const scanModes = [
     {
@@ -80,7 +96,7 @@ export const ScanScreen: React.FC = () => {
         <Card
           key={mode.id}
           style={{ marginBottom: spacing.md }}
-          onPress={() => {}}
+          onPress={() => handleScanModePress(mode.title)}
           accessibilityLabel={`${mode.title}: ${mode.description}`}
         >
           <View style={styles.modeCard}>
@@ -131,7 +147,12 @@ export const ScanScreen: React.FC = () => {
 
       {/* Manual Fallback */}
       <View style={{ marginTop: spacing.lg }}>
-        <Button title="Manual Text Search" onPress={() => {}} variant="outline" />
+        <Button
+          title="Manual Text Search"
+          onPress={handleManualSearchPress}
+          variant="outline"
+          accessibilityHint="Simulates text-based food search"
+        />
       </View>
     </ScreenContainer>
   );

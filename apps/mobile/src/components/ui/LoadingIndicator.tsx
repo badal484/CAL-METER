@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   fullScreen: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 999,
   },
 });

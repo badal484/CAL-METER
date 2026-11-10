@@ -44,10 +44,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
 
   return (
     <View style={[containerStyle, style]}>
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={colors.background}
-      />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {header ? <View>{header}</View> : null}
 

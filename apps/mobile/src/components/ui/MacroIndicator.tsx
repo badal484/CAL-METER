@@ -20,9 +20,16 @@ export const MacroIndicator: React.FC<MacroIndicatorProps> = ({ protein, carbs, 
   const { colors, typography, radii, spacing } = theme;
 
   const renderMacroCol = (item: MacroItemData) => {
-    const validTarget = item.targetGrams > 0 ? item.targetGrams : 1;
-    const ratio = Math.min(Math.max(item.currentGrams / validTarget, 0), 1);
-    const pct = Math.round(ratio * 100);
+    const safeCurrent =
+      typeof item.currentGrams === 'number' && Number.isFinite(item.currentGrams)
+        ? Math.max(0, item.currentGrams)
+        : 0;
+    const safeTarget =
+      typeof item.targetGrams === 'number' && Number.isFinite(item.targetGrams)
+        ? Math.max(0, item.targetGrams)
+        : 0;
+    const ratio = safeTarget > 0 ? Math.min(Math.max(safeCurrent / safeTarget, 0), 1) : 0;
+    const pct = Number.isFinite(ratio) ? Math.min(100, Math.max(0, Math.round(ratio * 100))) : 0;
 
     return (
       <View
@@ -32,7 +39,7 @@ export const MacroIndicator: React.FC<MacroIndicatorProps> = ({ protein, carbs, 
           { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md },
         ]}
         accessible
-        accessibilityLabel={`${item.label}: ${Math.round(item.currentGrams)} of ${Math.round(item.targetGrams)} grams, ${pct}%`}
+        accessibilityLabel={`${item.label}: ${Math.round(safeCurrent)} of ${Math.round(safeTarget)} grams, ${pct}%`}
       >
         <Text style={[typography.labelSmall, { color: colors.textSecondary }]}>{item.label}</Text>
 
@@ -42,14 +49,14 @@ export const MacroIndicator: React.FC<MacroIndicatorProps> = ({ protein, carbs, 
             { color: colors.textPrimary, marginVertical: spacing.xxs },
           ]}
         >
-          {Math.round(item.currentGrams)}
+          {Math.round(safeCurrent)}
           <Text style={[typography.caption, { color: colors.textTertiary }]}>g</Text>
         </Text>
 
         <Text
           style={[typography.caption, { color: colors.textTertiary, marginBottom: spacing.xs }]}
         >
-          / {Math.round(item.targetGrams)}g
+          / {Math.round(safeTarget)}g
         </Text>
 
         <View

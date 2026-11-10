@@ -75,26 +75,28 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
 
         if (isScan) {
           return (
-            <View key={route.key} style={styles.scanTabSlot}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel="Scan Food or Barcode"
-                accessibilityHint="Opens the AI food recognition, barcode scanner, and nutrition label OCR camera"
-                testID="tab-scan"
-                onPress={onPress}
-                onLongPress={onLongPress}
-                style={({ pressed }) => [
+            <Pressable
+              key={route.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isFocused }}
+              accessibilityLabel="Scan Tab"
+              accessibilityHint="Opens the AI food recognition, barcode scanner, and nutrition label OCR camera"
+              testID="tab-scan"
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={({ pressed }) => [styles.scanTabSlot, { opacity: pressed ? 0.85 : 1.0 }]}
+            >
+              <View
+                style={[
                   styles.scanButton,
                   {
                     backgroundColor: theme.colors.tabBarActive,
-                    transform: [{ scale: pressed ? 0.95 : 1.0 }],
                   },
                   theme.shadows.md,
                 ]}
               >
                 {getIcon(route.name, theme.colors.background, 24)}
-              </Pressable>
+              </View>
               <Text
                 style={[
                   styles.scanLabel,
@@ -105,7 +107,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
               >
                 Scan
               </Text>
-            </View>
+            </Pressable>
           );
         }
 
@@ -117,7 +119,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
           <Pressable
             key={route.key}
             accessibilityRole="tab"
-            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityState={{ selected: isFocused }}
             accessibilityLabel={`${label as string} Tab`}
             testID={`tab-${route.name.toLowerCase()}`}
             onPress={onPress}
@@ -176,6 +178,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -16,
+    minHeight: 48,
+    minWidth: 48,
   },
   scanButton: {
     width: 52,

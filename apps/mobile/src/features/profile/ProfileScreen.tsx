@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import { View, Text, StyleSheet, Switch, Pressable, Alert } from 'react-native';
 import { ScreenContainer, Card, SectionHeader, Button } from '../../components';
 import { useTheme } from '../../app/providers/ThemeProvider';
 import {
@@ -18,30 +18,42 @@ export const ProfileScreen: React.FC = () => {
 
   const [useMetric, setUseMetric] = useState(true);
 
+  const handleMenuItemPress = (title: string, plannedMilestone: string) => {
+    Alert.alert(
+      `${title} [Preview]`,
+      `${title} settings and management workflows are scheduled for ${plannedMilestone}.`,
+      [{ text: 'OK' }],
+    );
+  };
+
   const profileMenuItems = [
     {
       id: 'goals',
       title: 'Nutrition & Macro Goals',
       subtitle: '2,100 kcal • 150g P / 220g C / 65g F',
       icon: <Target size={20} color={colors.textPrimary} />,
+      milestone: 'Milestone 6',
     },
     {
       id: 'biometrics',
       title: 'Biometrics & Body Stats',
       subtitle: '178 cm • 81.4 kg (Goal: 75 kg)',
       icon: <Scale size={20} color={colors.textPrimary} />,
+      milestone: 'Milestone 6',
     },
     {
       id: 'subscription',
       title: 'CAL METER Pro',
       subtitle: 'Free Tier Preview (3 AI scans / day)',
       icon: <CreditCard size={20} color={colors.textPrimary} />,
+      milestone: 'Milestone 10',
     },
     {
       id: 'privacy',
       title: 'Privacy & Data Export',
       subtitle: 'GDPR / DPDP compliance',
       icon: <ShieldCheck size={20} color={colors.textPrimary} />,
+      milestone: 'Milestone 11',
     },
   ];
 
@@ -153,15 +165,21 @@ export const ProfileScreen: React.FC = () => {
       <SectionHeader title="Settings & Management" />
       <Card style={{ padding: 0, marginBottom: spacing.xl }}>
         {profileMenuItems.map((item, index) => (
-          <View
+          <Pressable
             key={item.id}
-            style={[
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title}, ${item.subtitle}`}
+            accessibilityHint={`Opens preview for ${item.title}`}
+            onPress={() => handleMenuItemPress(item.title, item.milestone)}
+            style={({ pressed }) => [
               styles.menuItem,
               {
                 paddingHorizontal: spacing.lg,
                 paddingVertical: spacing.md,
                 borderBottomColor: colors.borderSubtle,
                 borderBottomWidth: index < profileMenuItems.length - 1 ? 1 : 0,
+                opacity: pressed ? 0.7 : 1.0,
+                minHeight: 48,
               },
             ]}
           >
@@ -177,7 +195,7 @@ export const ProfileScreen: React.FC = () => {
             </View>
 
             <ChevronRight size={18} color={colors.textTertiary} />
-          </View>
+          </Pressable>
         ))}
       </Card>
 

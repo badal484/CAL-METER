@@ -1,7 +1,9 @@
 pluginManagement {
     def pluginPath = file("../node_modules/@react-native/gradle-plugin").exists() ?
         "../node_modules/@react-native/gradle-plugin" :
-        "../../node_modules/@react-native/gradle-plugin"
+        file("../../node_modules/@react-native/gradle-plugin").exists() ?
+            "../../node_modules/@react-native/gradle-plugin" :
+            "../../../node_modules/@react-native/gradle-plugin"
     includeBuild(pluginPath)
 }
 plugins { id("com.facebook.react.settings") }
@@ -10,5 +12,7 @@ rootProject.name = 'com.calmeter.app'
 include ':app'
 def pluginPath = file("../node_modules/@react-native/gradle-plugin").exists() ?
     "../node_modules/@react-native/gradle-plugin" :
-    "../../node_modules/@react-native/gradle-plugin"
+    file("../../node_modules/@react-native/gradle-plugin").exists() ?
+        "../../node_modules/@react-native/gradle-plugin" :
+        "../../../node_modules/@react-native/gradle-plugin"
 includeBuild(pluginPath)

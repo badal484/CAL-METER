@@ -1,4 +1,6 @@
+import React from 'react';
 import { describe, it, expect } from 'vitest';
+import ReactTestRenderer, { act } from 'react-test-renderer';
 import {
   lightTheme,
   darkTheme,
@@ -9,8 +11,10 @@ import {
   shadows,
   typography,
 } from '../src/theme';
+import { ThemeProvider, useTheme } from '../src/app/providers/ThemeProvider';
+import { Text } from 'react-native';
 
-describe('Design System: Theme Tokens', () => {
+describe('Design System: Theme Tokens & Typography', () => {
   it('defines consistent monochrome palette colors', () => {
     expect(PALETTE.white).toBe('#FFFFFF');
     expect(PALETTE.black).toBe('#000000');
@@ -89,5 +93,91 @@ describe('Design System: Theme Tokens', () => {
     expect(shadows.medium).toBeDefined();
     expect(shadows.sm).toBe(shadows.subtle);
     expect(shadows.md).toBe(shadows.medium);
+  });
+});
+
+describe('ThemeProvider Component & Hook Context', () => {
+  it('renders children with light theme by default and propagates theme to consumers', () => {
+    let capturedTheme: ReturnType<typeof useTheme> | null = null;
+
+    const TestConsumer: React.FC = () => {
+      const themeCtx = useTheme();
+      capturedTheme = themeCtx;
+      return <Text testID="theme-mode">{themeCtx.isDark ? 'dark' : 'light'}</Text>;
+    };
+
+    let tree: ReactTestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = ReactTestRenderer.create(
+        <ThemeProvider initialMode="light">
+          <TestConsumer />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(capturedTheme).not.toBeNull();
+    expect(capturedTheme!.isDark).toBe(false);
+    expect(capturedTheme!.theme.colors.background).toBe(PALETTE.white);
+    expect(tree!.root.findByProps({ testID: 'theme-mode' }).props.children).toBe('light');
+  });
+
+  it('supports initialMode="dark" configuration', () => {
+    let capturedTheme: ReturnType<typeof useTheme> | null = null;
+
+    const TestConsumer: React.FC = () => {
+      capturedTheme = useTheme();
+      return null;
+    };
+
+    act(() => {
+      ReactTestRenderer.create(
+        <ThemeProvider initialMode="dark">
+          <TestConsumer />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(capturedTheme).not.toBeNull();
+    expect(capturedTheme!.isDark).toBe(true);
+    expect(capturedTheme!.theme.colors.background).toBe(PALETTE.black);
+  });
+
+  it('toggles theme when toggleTheme() is invoked', () => {
+    let toggleFn: () => void = () => {};
+    let isDarkValue = false;
+
+    const TestConsumer: React.FC = () => {
+      const { toggleTheme, isDark } = useTheme();
+      toggleFn = toggleTheme;
+      isDarkValue = isDark;
+      return <Text testID="current-mode">{isDark ? 'dark' : 'light'}</Text>;
+    };
+
+    let tree: ReactTestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = ReactTestRenderer.create(
+        <ThemeProvider initialMode="light">
+          <TestConsumer />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(isDarkValue).toBe(false);
+
+    // Toggle to Dark
+    act(() => {
+      toggleFn();
+    });
+
+    expect(isDarkValue).toBe(true);
+    expect(tree!.root.findByProps({ testID: 'current-mode' }).props.children).toBe('dark');
+
+    // Toggle back to Light
+    act(() => {
+      toggleFn();
+    });
+
+    expect(isDarkValue).toBe(false);
+    expect(tree!.root.findByProps({ testID: 'current-mode' }).props.children).toBe('light');
   });
 });
