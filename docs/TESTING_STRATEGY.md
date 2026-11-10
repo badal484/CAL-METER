@@ -53,10 +53,16 @@ describe('Nutrition Math Engine', () => {
 
 ### 2.2. Integration Testing (Target Coverage: > 80%)
 
-- **Test Runner:** Supertest + Jest executing against a dedicated PostgreSQL test container.
+- **Test Runner:** Vitest + Supertest executing against a dedicated, isolated PostgreSQL test database (`calmeter_test`).
+- **Safety Policy & Migration Guard:**
+  - Database integration tests and test migrations strictly require `NODE_ENV=test`.
+  - An explicit `TEST_DATABASE_URL` targeting a database named `calmeter_test` or ending with `_test` is mandatory.
+  - Test commands fail closed and will NEVER fall back to `DATABASE_URL` or substitute default database URLs.
+  - Production credentials or databases must never be used for tests or test migrations.
+  - Run test migrations via: `NODE_ENV=test TEST_DATABASE_URL=<url> npm run prisma:migrate:test`.
 - **Scope:**
   - HTTP endpoints: Request validation, Firebase auth mock interceptors, response envelopes.
-  - Prisma database queries: Cascading deletes, tenant isolation constraints, trigram search accuracy.
+  - Prisma database queries: Cascading deletes, tenant isolation constraints, PostgreSQL CHECK constraint verification.
   - Redis cache: Key expiration, invalidation on meal updates, rate limiter sliding windows.
   - BullMQ Worker: Job dispatch, retry on simulated Gemini API timeout, database persistence.
 

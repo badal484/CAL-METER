@@ -69,14 +69,14 @@ describe('Database Guard: Isolation & Configuration Safety', () => {
         'postgresql://calmeter:calmeter@localhost:5432/calmeter_test',
         'development',
       ),
-    ).toThrow(/Refusing to run database tests outside of NODE_ENV=test/i);
+    ).toThrow(/Refusing to run database tests or migrations outside of NODE_ENV=test/i);
 
     expect(() =>
       validateTestDatabaseUrl(
         'postgresql://calmeter:calmeter@localhost:5432/calmeter_test',
         'production',
       ),
-    ).toThrow(/Refusing to run database tests outside of NODE_ENV=test/i);
+    ).toThrow(/Refusing to run database tests or migrations outside of NODE_ENV=test/i);
   });
 
   it('rejects non-PostgreSQL protocols', () => {
