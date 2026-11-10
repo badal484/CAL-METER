@@ -47,6 +47,29 @@ describe('Measurement Conversions', () => {
   it('rounds accurately to specified decimals', () => {
     expect(roundTo(3.14159, 2)).toBe(3.14);
     expect(roundTo(3.14159, 4)).toBe(3.1416);
+    expect(roundTo(150.123, 1)).toBe(150.1);
+    expect(roundTo(2000.5, 0)).toBe(2001);
+  });
+
+  describe('roundTo Overflow and Precision Safety', () => {
+    it('throws DomainValidationError when multiplying by decimal factor overflows to Infinity', () => {
+      // 1e308 is finite, but 1e308 * 10 (decimals = 1) = Infinity
+      expect(() => roundTo(1e308, 1)).toThrow(DomainValidationError);
+      expect(() => roundTo(1e308, 2)).toThrow(DomainValidationError);
+      expect(() => roundTo(-1e308, 1)).toThrow(DomainValidationError);
+      expect(() => roundTo(Number.MAX_VALUE, 1)).toThrow(DomainValidationError);
+    });
+
+    it('preserves extremely large finite values when decimal factor does not overflow', () => {
+      // decimals = 0 has factor 1, so 1e308 * 1 stays finite
+      expect(roundTo(1e308, 0)).toBe(1e308);
+    });
+
+    it('rejects invalid decimal place specifications', () => {
+      expect(() => roundTo(100, -1)).toThrow(DomainValidationError);
+      expect(() => roundTo(100, 1.5)).toThrow(DomainValidationError);
+      expect(() => roundTo(100, 11)).toThrow(DomainValidationError);
+    });
   });
 
   it('rejects non-finite inputs with DomainValidationError', () => {

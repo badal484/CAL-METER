@@ -189,6 +189,65 @@ describe('Macronutrient Calculation', () => {
       expect(result.carbsGrams).toBe(50);
       expect(result.fatGrams).toBe(10);
     });
+
+    describe('Energy Consistency 5.0% Threshold Precision Boundary Tests', () => {
+      // dailyCalories = 3000 kcal. Here 5.0% = 150 kcal (> 100 kcal absolute limit).
+      // Case 1: Just below 5.0% threshold (delta = +149 kcal, raw variance = 4.9667%)
+      it('treats custom macros just below 5.0% threshold as consistent', () => {
+        // P: 200g (800 kcal) + C: 441g (1764 kcal) + F: 65g (585 kcal) = 3,149 kcal
+        // Delta = +149 kcal (> 100 kcal), but raw variance = 4.9667% <= 5.0%
+        const result = calculateMacronutrients({
+          dailyCalories: 3000,
+          customProteinGrams: 200,
+          customCarbsGrams: 441,
+          customFatGrams: 65,
+        });
+
+        expect(result.macroDerivedCalories).toBe(3149);
+        expect(result.calorieDelta).toBe(149);
+        expect(result.isEnergyConsistent).toBe(true);
+        expect(result.warnings).toHaveLength(0);
+        // Displayed/stored percentage is rounded only after the decision
+        expect(result.calorieVariancePercentage).toBe(5.0);
+      });
+
+      // Case 2: Just above 5.0% threshold (delta = +151 kcal, raw variance = 5.0333%)
+      it('treats custom macros just above 5.0% threshold as inconsistent', () => {
+        // P: 200g (800 kcal) + C: 437g (1748 kcal) + F: 67g (603 kcal) = 3,151 kcal
+        // Delta = +151 kcal (> 100 kcal) AND raw variance = 5.0333% > 5.0%
+        const result = calculateMacronutrients({
+          dailyCalories: 3000,
+          customProteinGrams: 200,
+          customCarbsGrams: 437,
+          customFatGrams: 67,
+        });
+
+        expect(result.macroDerivedCalories).toBe(3151);
+        expect(result.calorieDelta).toBe(151);
+        expect(result.isEnergyConsistent).toBe(false);
+        expect(result.warnings).toHaveLength(1);
+        expect(result.calorieVariancePercentage).toBe(5.0);
+      });
+
+      // Case 3: Absolute difference <= 100 kcal remains consistent even if variance > 5%
+      it('treats custom macros with absolute difference <= 100 kcal as consistent even if percentage exceeds 5%', () => {
+        // dailyCalories = 1000, macros = 1070 kcal (delta = +70 kcal <= 100 kcal, but variance = 7.0%)
+        // P: 70g (280 kcal) + C: 120g (480 kcal) + F: 34.444g -> 310 kcal -> total 1070
+        // P: 70g (280) + C: 130g (520) + F: 30g (270) = 1070 kcal
+        const result = calculateMacronutrients({
+          dailyCalories: 1000,
+          customProteinGrams: 70,
+          customCarbsGrams: 130,
+          customFatGrams: 30,
+        });
+
+        expect(result.macroDerivedCalories).toBe(1070);
+        expect(result.calorieDelta).toBe(70);
+        expect(result.isEnergyConsistent).toBe(true);
+        expect(result.warnings).toHaveLength(0);
+        expect(result.calorieVariancePercentage).toBe(7.0);
+      });
+    });
   });
 
   describe('Partial Custom Macro Rejection', () => {

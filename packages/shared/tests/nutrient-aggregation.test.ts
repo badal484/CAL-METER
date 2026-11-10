@@ -169,5 +169,44 @@ describe('Nutrient Aggregation', () => {
         expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
       });
     });
+
+    describe('Post-Aggregation Rounding Overflow Protection', () => {
+      // 1e308 is finite and does not overflow during single-item addition,
+      // but overflows to Infinity when multiplied by 10 during 1-decimal rounding.
+      const roundingOverflowValue = 1e308;
+
+      it('rejects when accumulated calories overflow during decimal rounding', () => {
+        const item: NutrientProfile = { ...validProfile, calories: roundingOverflowValue };
+        expect(() => aggregateNutrients([item])).toThrow(DomainValidationError);
+      });
+
+      it('rejects when accumulated protein overflows during decimal rounding', () => {
+        const item: NutrientProfile = { ...validProfile, proteinGrams: roundingOverflowValue };
+        expect(() => aggregateNutrients([item])).toThrow(DomainValidationError);
+      });
+
+      it('rejects when accumulated carbs overflow during decimal rounding', () => {
+        const item: NutrientProfile = { ...validProfile, carbsGrams: roundingOverflowValue };
+        expect(() => aggregateNutrients([item])).toThrow(DomainValidationError);
+      });
+
+      it('rejects when accumulated fat overflows during decimal rounding', () => {
+        const item: NutrientProfile = { ...validProfile, fatGrams: roundingOverflowValue };
+        expect(() => aggregateNutrients([item])).toThrow(DomainValidationError);
+      });
+
+      it('rejects when accumulated fiber overflows during decimal rounding', () => {
+        const item: NutrientProfile = { ...validProfile, fiberGrams: roundingOverflowValue };
+        expect(() => aggregateNutrients([item])).toThrow(DomainValidationError);
+      });
+
+      it('rejects when accumulated micronutrients overflow during decimal rounding', () => {
+        const item: NutrientProfile = {
+          ...validProfile,
+          micronutrients: { zincMg: roundingOverflowValue },
+        };
+        expect(() => aggregateNutrients([item])).toThrow(DomainValidationError);
+      });
+    });
   });
 });

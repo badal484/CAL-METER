@@ -71,14 +71,23 @@ export function roundTo(value: number, decimals: number = 2): number {
       `Decimals must be an integer between 0 and 10 (received: ${decimals}).`,
     );
   }
-  if (!Number.isFinite(value)) {
-    throw new DomainValidationError(`Value to round must be a finite number (received: ${value}).`);
-  }
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 10) {
+
+  const factor = Math.pow(10, decimals);
+  const multiplied = (value + Number.EPSILON) * factor;
+
+  if (!Number.isFinite(multiplied)) {
     throw new DomainValidationError(
-      `Decimals must be an integer between 0 and 10 (received: ${decimals}).`,
+      `Rounding value ${value} to ${decimals} decimals resulted in intermediate numeric overflow.`,
     );
   }
-  const factor = Math.pow(10, decimals);
-  return Math.round((value + Number.EPSILON) * factor) / factor;
+
+  const rounded = Math.round(multiplied) / factor;
+
+  if (!Number.isFinite(rounded)) {
+    throw new DomainValidationError(
+      `Rounding value ${value} to ${decimals} decimals produced a non-finite result (${rounded}).`,
+    );
+  }
+
+  return rounded;
 }

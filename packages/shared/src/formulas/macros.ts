@@ -113,10 +113,11 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
     const fatPct = macroDerivedCalories > 0 ? roundTo(fatCalories / macroDerivedCalories, 3) : 0;
 
     const calorieDelta = macroDerivedCalories - dailyCalories;
-    const calorieVariancePercentage = roundTo((Math.abs(calorieDelta) / dailyCalories) * 100, 1);
+    const rawVariancePct = dailyCalories > 0 ? (Math.abs(calorieDelta) / dailyCalories) * 100 : 0;
     const isEnergyConsistent =
       Math.abs(calorieDelta) <= MACRO_ENERGY_CONSISTENCY_ABSOLUTE_KCAL ||
-      calorieVariancePercentage <= MACRO_ENERGY_CONSISTENCY_TOLERANCE_PCT;
+      rawVariancePct <= MACRO_ENERGY_CONSISTENCY_TOLERANCE_PCT;
+    const calorieVariancePercentage = roundTo(rawVariancePct, 1);
 
     const warnings: string[] = [];
     if (!isEnergyConsistent) {
@@ -181,7 +182,8 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
   const fatGrams = roundTo(fatCalories / ATWATER_FACTORS.FAT, 1);
 
   const calorieDelta = macroDerivedCalories - dailyCalories;
-  const calorieVariancePercentage = roundTo((Math.abs(calorieDelta) / dailyCalories) * 100, 1);
+  const rawVariancePct = dailyCalories > 0 ? (Math.abs(calorieDelta) / dailyCalories) * 100 : 0;
+  const calorieVariancePercentage = roundTo(rawVariancePct, 1);
   const isEnergyConsistent = true; // In percentage distribution, calories are directly scaled from dailyCalories
 
   return {

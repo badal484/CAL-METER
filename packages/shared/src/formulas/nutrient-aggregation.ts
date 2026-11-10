@@ -98,17 +98,44 @@ export function aggregateNutrients(profiles: NutrientProfile[]): NutrientProfile
     }
   }
 
-  const roundedMicros =
-    Object.keys(mergedMicros).length > 0
-      ? Object.entries(mergedMicros).reduce((acc, [k, v]) => ({ ...acc, [k]: roundTo(v, 2) }), {})
-      : undefined;
+  const roundedCalories = roundTo(totalCalories, 1);
+  const roundedProtein = roundTo(totalProtein, 1);
+  const roundedCarbs = roundTo(totalCarbs, 1);
+  const roundedFat = roundTo(totalFat, 1);
+  const roundedFiber = totalFiber !== undefined ? roundTo(totalFiber, 1) : undefined;
+
+  if (
+    !Number.isFinite(roundedCalories) ||
+    !Number.isFinite(roundedProtein) ||
+    !Number.isFinite(roundedCarbs) ||
+    !Number.isFinite(roundedFat) ||
+    (roundedFiber !== undefined && !Number.isFinite(roundedFiber))
+  ) {
+    throw new DomainValidationError(
+      'Aggregated nutrition totals produced non-finite values after decimal rounding.',
+    );
+  }
+
+  let roundedMicros: Record<string, number> | undefined = undefined;
+  if (Object.keys(mergedMicros).length > 0) {
+    roundedMicros = {};
+    for (const [k, v] of Object.entries(mergedMicros)) {
+      const roundedVal = roundTo(v, 2);
+      if (!Number.isFinite(roundedVal)) {
+        throw new DomainValidationError(
+          `Aggregated micronutrient '${k}' produced a non-finite value after decimal rounding (${roundedVal}).`,
+        );
+      }
+      roundedMicros[k] = roundedVal;
+    }
+  }
 
   return {
-    calories: roundTo(totalCalories, 1),
-    proteinGrams: roundTo(totalProtein, 1),
-    carbsGrams: roundTo(totalCarbs, 1),
-    fatGrams: roundTo(totalFat, 1),
-    fiberGrams: totalFiber !== undefined ? roundTo(totalFiber, 1) : undefined,
+    calories: roundedCalories,
+    proteinGrams: roundedProtein,
+    carbsGrams: roundedCarbs,
+    fatGrams: roundedFat,
+    fiberGrams: roundedFiber,
     micronutrients: roundedMicros,
   };
 }
