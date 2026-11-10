@@ -226,6 +226,13 @@ flowchart TD
 - **FR-22.3:** Self-service Data Export: Request JSON or CSV bundle of full user logging history.
 - **FR-22.4:** Opt-in / Opt-out for model improvement data retention.
 
+### 5.9. AI Nutrition Coach & Personalized Insights (Feature 14)
+
+- **FR-14.1 (Conversational Nutrition Coach):** Context-aware guidance utilizing the user's authentic daily food diary, macronutrient targets, and tracking trends. Personal identifiers (name, email, user UUID) are strictly stripped before context payload transmission to external LLM providers.
+- **FR-14.2 (Deterministic Numerical Calculations):** All quantitative calculations (calorie progress, protein pacing, fiber intake, hydration adherence, weight trajectory with $\ge 2$ readings, exercise habit) are executed by deterministic backend engines. The AI model translates verified numbers into educational natural language guidance without inventing statistics.
+- **FR-14.3 (Tailored Meal Recommendations):** Proposes balanced meals constructed from verified food database entries, deterministically scaled to the user's remaining calories and macros, while strictly honoring dietary preferences (`VEGETARIAN`, `VEGAN`, `JAIN`, `HALAL`, etc.).
+- **FR-14.4 (Safety Guardrails & Medical Refusal):** Fails closed and actively refuses queries promoting dangerous restriction (e.g. eating < 500 kcal/day, purging, extreme fasting). Strictly refuses clinical medical diagnoses or prescription medications, advising consultation with licensed physicians and dietitians.
+
 ---
 
 ## 6. Food Serving Modeling & Regional Data Specifications

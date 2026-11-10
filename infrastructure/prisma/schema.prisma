@@ -141,6 +141,30 @@ enum CalorieEstimateSource {
   DEVICE
 }
 
+enum CoachRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum InsightType {
+  CALORIE_PROGRESS
+  PROTEIN_PACING
+  MACRO_DISTRIBUTION
+  FIBER_INTAKE
+  HYDRATION_CONSISTENCY
+  EXERCISE_HABIT
+  WEIGHT_TRAJECTORY
+  MEAL_REGULARITY
+}
+
+enum InsightCategory {
+  CELEBRATION
+  RECOMMENDATION
+  OBSERVATION
+  CAUTION
+}
+
 // -------------------------------------------------------------
 // MODELS
 // -------------------------------------------------------------
@@ -162,6 +186,8 @@ model User {
   weights      WeightLog[]
   waters       WaterLog[]
   exercises    ExerciseLog[]
+  coachMessages CoachMessage[]
+  coachInsights CoachInsight[]
   subscription Subscription?
   customFoods  FoodItem[]        @relation("UserCustomFoods")
   deletionReq  DeletionRequest?
@@ -603,4 +629,39 @@ model DeletionRequest {
 
   @@map("deletion_requests")
 }
+
+model CoachMessage {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      CoachRole @default(USER)
+  content   String    @db.Text
+  metadata  Json?     @db.JsonB
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("coach_messages")
+}
+
+model CoachInsight {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  type           InsightType
+  category       InsightCategory @default(OBSERVATION)
+  title          String          @db.VarChar(150)
+  message        String          @db.Text
+  actionableTip  String?         @map("actionable_tip") @db.VarChar(300)
+  periodAnalyzed String          @map("period_analyzed") @db.VarChar(50)
+  metricData     Json?           @map("metric_data") @db.JsonB
+  generatedAt    DateTime        @default(now()) @map("generated_at")
+  expiresAt      DateTime?       @map("expires_at")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt(sort: Desc)])
+  @@index([userId, type])
+  @@map("coach_insights")
+}
+
 

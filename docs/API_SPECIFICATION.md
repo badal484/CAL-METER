@@ -1171,3 +1171,200 @@ Includes non-diet-credit and non-medical wellness notices confirming exercise ca
 
 - `POST /account/export`: Enqueues full GDPR data export bundle generation. User receives email with encrypted download link.
 - `DELETE /account`: Enforces Apple App Store Guideline 5.1.1(v). Immediately revokes auth tokens, deletes S3 image assets, cascades deletes all user database records, and triggers RevenueCat/PostHog deletion events.
+
+---
+
+### Module 9: AI Nutrition Coach & Personalized Insights (`/coach`)
+
+Endpoints powering conversational nutrition guidance, deterministic habit insights, and tailored meal suggestions based on authentic user logs.
+
+#### 1. Conversational Nutrition Coach
+
+##### `POST /coach/message`
+
+Sends a query to the AI Nutrition Coach. The backend aggregates anonymized user physiological metrics (height, weight, biological sex, goals, consumed vs remaining calories/macros, logged meals, hydration status, recent activities) without exposing PII (names, emails, user IDs).
+
+- **Headers:** `Authorization: Bearer <Firebase_ID_Token>`
+- **Request Body (`SendCoachMessageDto`):**
+
+```json
+{
+  "message": "What should I eat for dinner to stay on track for my 2,000 calorie target?"
+}
+```
+
+- **Response (`200 OK`, `CoachMessageResponseDto`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "reply": "You have consumed 1,200 kcal today, leaving 800 kcal remaining. A balanced option would be 2 whole wheat rotis with a katori of Moong Dal Tadka and a cucumber salad.",
+    "messageId": "d8213b19-f9c3-4d76-9d33-40a2c03fb242",
+    "suggestedPrompts": ["How is my protein intake today?", "Suggest a high-protein snack"],
+    "disclaimers": [
+      "CAL METER provides lifestyle nutrition guidance and does not provide clinical medical diagnosis or treatment."
+    ]
+  }
+}
+```
+
+##### `GET /coach/history`
+
+Retrieves conversation history chronologically.
+
+- **Query Parameters:** `limit` (default: 50, max: 100)
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [
+      {
+        "id": "c13d9e03-34e8-4221-a320-141a27e777e5",
+        "userId": "c53d9e03-34e8-4221-a320-141a27e777e5",
+        "role": "USER",
+        "content": "What should I eat for dinner?",
+        "createdAt": "2026-11-10T18:00:00.000Z"
+      },
+      {
+        "id": "d8213b19-f9c3-4d76-9d33-40a2c03fb242",
+        "userId": "c53d9e03-34e8-4221-a320-141a27e777e5",
+        "role": "ASSISTANT",
+        "content": "You have consumed 1,200 kcal today...",
+        "createdAt": "2026-11-10T18:00:02.000Z"
+      }
+    ],
+    "totalCount": 2
+  }
+}
+```
+
+##### `DELETE /coach/history`
+
+Clears conversation history for the authenticated user.
+
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "message": "Coach conversation history cleared."
+  }
+}
+```
+
+#### 2. Deterministic Personalized Insights
+
+##### `GET /coach/insights`
+
+Evaluates deterministic nutrition metrics (calorie pacing, protein pacing, fiber intake, hydration adherence, weight trajectory with $\ge 2$ readings, exercise consistency). Explains patterns in objective natural language without fabricating numbers.
+
+- **Query Parameters:** `forceRefresh` (boolean, optional)
+- **Response (`200 OK`, `InsightsResponseDto`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "date": "2026-11-10",
+    "insights": [
+      {
+        "type": "CALORIE_PROGRESS",
+        "category": "OBSERVATION",
+        "title": "Calorie Pacing On Track",
+        "message": "You have logged 800 kcal out of your 2,000 kcal target (40%).",
+        "actionableTip": "Include complex carbohydrates and lean protein in your evening meal.",
+        "periodAnalyzed": "TODAY",
+        "metricData": {
+          "current": 800,
+          "target": 2000,
+          "unit": "kcal",
+          "percentage": 40
+        }
+      },
+      {
+        "type": "WEIGHT_TRAJECTORY",
+        "category": "CELEBRATION",
+        "title": "Steady Weight Progress",
+        "message": "Your weight has decreased by 1.5 kg across your last 5 tracked days toward your 72 kg goal.",
+        "actionableTip": "Remember that day-to-day fluctuations of ±0.5–1.5 kg reflect fluid balance rather than fat tissue changes.",
+        "periodAnalyzed": "PAST_5_DAYS",
+        "metricData": {
+          "current": 78.0,
+          "target": 72.0,
+          "unit": "kg",
+          "percentage": 92.3,
+          "delta": -1.5
+        }
+      }
+    ],
+    "disclaimer": "Personalized insights are derived deterministically from your actual logged food and tracking data. They are designed for educational habit guidance and do not constitute clinical diagnosis."
+  }
+}
+```
+
+#### 3. Tailored Meal Recommendations
+
+##### `GET /coach/recommendations`
+
+Returns tailored meal suggestions based on verified food database entries, respecting dietary preferences (`VEGETARIAN`, `VEGAN`, `JAIN`, `HALAL`, etc.) and scaling portions to fit remaining calories and macros.
+
+- **Query Parameters:** `mealType` (optional: `BREAKFAST`, `LUNCH`, `DINNER`, `SNACK`), `date` (optional: `YYYY-MM-DD`)
+- **Response (`200 OK`, `MealRecommendationsResponseDto`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "date": "2026-11-10",
+    "remainingCalories": 800,
+    "remainingProtein": 45,
+    "remainingCarbs": 95,
+    "remainingFat": 22,
+    "recommendations": [
+      {
+        "id": "rec-1",
+        "mealType": "DINNER",
+        "title": "Phulkas with Moong Dal Tadka & Salad",
+        "description": "Traditional home-cooked dinner with whole wheat flatbreads and yellow lentil soup.",
+        "cuisine": "North Indian",
+        "totalCalories": 410,
+        "totalProtein": 16.5,
+        "totalCarbs": 72.0,
+        "totalFat": 3.5,
+        "fitsRemainingBudget": true,
+        "dietaryTags": ["VEGETARIAN", "HIGH_FIBER", "HALAL"],
+        "items": [
+          {
+            "foodName": "Whole Wheat Roti",
+            "portionAmount": 2,
+            "servingUnit": "piece",
+            "gramWeight": 70,
+            "calories": 208,
+            "protein": 6.8,
+            "carbs": 44.0,
+            "fat": 0.8,
+            "isVerified": true
+          },
+          {
+            "foodName": "Yellow Moong Dal Tadka",
+            "portionAmount": 1,
+            "servingUnit": "katori",
+            "gramWeight": 200,
+            "calories": 190,
+            "protein": 10.8,
+            "carbs": 29.0,
+            "fat": 4.2,
+            "isVerified": true
+          }
+        ]
+      }
+    ],
+    "disclaimer": "Tailored recommendations are suggestions scaled to your remaining budget."
+  }
+}
+```

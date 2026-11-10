@@ -20,6 +20,8 @@ erDiagram
     User ||--o{ WeightLog : "records"
     User ||--o{ WaterLog : "tracks"
     User ||--o{ ExerciseLog : "performs"
+    User ||--o{ CoachMessage : "converses"
+    User ||--o{ CoachInsight : "receives"
     User ||--o| Subscription : "holds"
     User ||--o{ FoodItem : "creates (custom)"
 
@@ -292,6 +294,30 @@ erDiagram
         string notes
         datetime createdAt
         datetime updatedAt
+    }
+
+    CoachMessage {
+        uuid id PK
+        uuid userId FK
+        enum role
+        string content
+        json metadata
+        datetime createdAt
+    }
+
+    CoachInsight {
+        uuid id PK
+        uuid userId FK
+        date date
+        enum type
+        enum category
+        string title
+        string message
+        string actionableTip
+        string periodAnalyzed
+        json metricData
+        datetime generatedAt
+        datetime createdAt
     }
 ```
 
@@ -862,6 +888,41 @@ model ExerciseLog {
   @@index([userId, performedAt(sort: Desc)])
   @@index([userId, category])
   @@map("exercise_logs")
+}
+
+model CoachMessage {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      CoachRole @default(USER)
+  content   String    @db.Text
+  metadata  Json?     @db.JsonB
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("coach_messages")
+}
+
+model CoachInsight {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  date           DateTime        @default(now()) @map("date") @db.Date
+  type           InsightType
+  category       InsightCategory
+  title          String          @db.VarChar(150)
+  message        String          @db.Text
+  actionableTip  String?         @map("actionable_tip") @db.VarChar(300)
+  periodAnalyzed String          @map("period_analyzed") @db.VarChar(50)
+  metricData     Json?           @map("metric_data") @db.JsonB
+  generatedAt    DateTime        @default(now()) @map("generated_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date(sort: Desc)])
+  @@index([userId, type])
+  @@map("coach_insights")
 }
 
 model Subscription {

@@ -234,3 +234,43 @@ Part 10 introduces rigorous end-to-end verification across the entire monorepo s
 - **Unit Conversions:** Validates client-side toggling between `kg`/`lbs` and `ml`/`L`/`fl oz` converts displayed values accurately.
 - **Quick-Add Actions:** Asserts tapping hydration quick-add buttons dispatches API calls with `{ source: "QUICK_ADD" }` and updates the progress indicator.
 - **Error & Offline Resilience:** Asserts network errors display `ErrorState` with retry pathways.
+
+---
+
+## 8. AI Nutrition Coach & Personalized Insights Test Suites (Part 11)
+
+Part 11 establishes complete test coverage across shared formulas, contracts, backend services, and mobile components:
+
+### 8.1. Shared Deterministic Insights Formulas (`packages/shared/tests/insights.test.ts`)
+
+- **Calorie Progress Pacing:** Validates calculations across normal, over-target, and empty daily logs with accurate percentage and delta tracking.
+- **Protein Pacing:** Validates protein distribution against targets with category flags (`CELEBRATION`, `RECOMMENDATION`, `OBSERVATION`).
+- **Fiber Intake Analysis:** Validates fiber benchmarks (adequate vs catch-up recommendation).
+- **Hydration Adherence:** Analyzes logged water volume against active targets.
+- **Weight Trajectory ($N \ge 2$ Invariant):** Strictly validates that weight trajectory analysis requires at least 2 distinct entries over time; returns `null` if fewer entries exist to avoid drawing conclusions from isolated readings.
+- **Physical Activity Habit:** Evaluates weekly aerobic activity minutes against WHO 150-minute guidelines.
+
+### 8.2. Contract Validation (`packages/contracts/tests/contracts.test.ts`)
+
+- **Coach Message Schemas:** Validates `SendCoachMessageSchema` (length limits, non-empty) and `CoachMessageResponseSchema`.
+- **Insight Schemas:** Validates `PersonalizedInsightSchema` and `InsightsResponseSchema`.
+- **Meal Recommendation Schemas:** Validates `MealRecommendationSchema`, `MealRecommendationItemSchema`, and query parameter schemas.
+
+### 8.3. Backend Integration & AI Safety Tests (`apps/api/tests/coachInsights.test.ts`)
+
+- **Context-Aware Coaching:** Validates user message dispatch with anonymized context (logged food, macros, remaining calories).
+- **Safety Guardrails (Starvation Refusal):** Asserts requests for extreme restriction (< 500 kcal/day, purging, vomiting) trigger automated refusal and guidance toward healthcare specialists.
+- **Safety Guardrails (Medical Diagnosis Refusal):** Asserts clinical medical diagnosis and prescription requests are actively refused with clinical disclaimers.
+- **Conversation History Lifecycle:** Verifies chronological history retrieval and complete deletion on `DELETE /api/v1/coach/history`.
+- **Deterministic Insight API:** Evaluates actual database meal logs, water logs, weight readings, and workouts into deterministic insight payloads.
+- **Tailored Meal Recommendations:** Asserts recommendations respect dietary preferences (e.g. Vegetarian users receive zero meat dishes) and correctly scale database foods.
+- **Multi-Tenant Isolation:** Asserts User B cannot access or clear User A's coach messages.
+
+### 8.4. Mobile Component & Workflow Tests (`apps/mobile/tests/coach.test.tsx`)
+
+- **Chat Interface:** Verifies header, educational disclaimer, user/assistant chat bubbles, and suggested prompt chips.
+- **Message Dispatch:** Simulates typing and submitting messages, asserting assistant replies update the conversation.
+- **Prompt Chip Quick-Send:** Validates tapping prompt chips automatically dispatches queries.
+- **Deterministic Insights Tab:** Validates switching to the Insights tab fetches and displays metric cards with progress bars and tips.
+- **Meal Ideas Tab:** Validates switching to the Meal Ideas tab displays remaining budget, meal cards, and "Log This Meal" confirmation.
+- **Error & Retry Handling:** Verifies network failures trigger `ErrorState` with retry pathways.

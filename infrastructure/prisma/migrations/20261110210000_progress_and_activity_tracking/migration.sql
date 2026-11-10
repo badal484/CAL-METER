@@ -73,3 +73,4 @@ CREATE INDEX "exercise_logs_user_id_performed_at_idx" ON "exercise_logs"("user_i
 
 -- AddForeignKey
 ALTER TABLE "exercise_logs" ADD CONSTRAINT "exercise_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

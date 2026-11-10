@@ -276,3 +276,34 @@ CAL METER adheres to strict privacy-by-design principles regarding mobile camera
 - **Zero Third-Party AI Exposure for Activity & Biometrics:** Weight logs, hydration volumes, and physical exercise history are strictly sequestered from external LLM/vision inference providers. They are stored and queried only in private PostgreSQL tables.
 - **Exercise Calorie Non-Diet-Credit Guarantee:** In accordance with evidence-based behavioral nutrition, exercise calories are tracked solely as physical activity progress and are strictly NOT credited to dietary food allowances. This architectural constraint protects users from overestimating expenditure and inadvertently inducing positive energy balances.
 - **Hydration & Progress Educational Disclaimers:** Progress reports and water summaries include explicit notifications that day-to-day weight fluctuations of ±0.5–1.5 kg are physiologically normal due to water retention, sodium, and glycogen replenishment, and that water baselines do not constitute personalized clinical fluid prescriptions.
+
+---
+
+## 9. AI Nutrition Coach Data Governance & Safety Guardrails
+
+### 9.1. Zero PII Exposure in LLM Context Payloads
+
+- CAL METER enforces strict data minimization before dispatching user queries to large language model providers (e.g. Google Gemini 2.0 Flash):
+  - **Permanently Stripped:** Full names, email addresses, phone numbers, Firebase UIDs, internal user UUIDs, IP addresses, and device identifiers are NEVER included in prompt payloads.
+  - **Permitted Minimal Context:** Only physiological attributes required for nutrition guidance are passed: biological sex, height in cm, current weight, target weight, primary goal, consumed vs target calories/macros, logged meal items, hydration volume, and recent exercise sessions.
+- Prompts instruct LLM models to provide habit-focused lifestyle guidance without diagnosing medical conditions or prescribing clinical interventions.
+
+### 9.2. Guardrails Against Dangerous Restriction & Eating Disorders
+
+- The coaching pipeline implements multi-layered safety guardrails that detect and actively reject prompts promoting:
+  - Dangerous energy restriction below physiological minimums (< 500 kcal/day).
+  - Purging, vomiting, or laxative misuse after eating.
+  - Extreme unmonitored water fasts or unrealistic weight loss claims (e.g. losing 10 kg in 3 days).
+- In such instances, the system responds with supportive, evidence-based harm-reduction messages and directs users to licensed healthcare specialists and eating disorder support resources.
+
+### 9.3. Non-Clinical Medical Safeguards
+
+- The AI Nutrition Coach strictly refuses clinical medical diagnosis and medication prescription:
+  - Any query asking to diagnose acute symptoms, manage severe metabolic crises, or prescribe pharmacological drugs triggers an automated refusal.
+  - Responses clearly state that CAL METER is an educational wellness tool and advise users to consult licensed medical physicians.
+
+### 9.4. User Conversation Deletion & GDPR Sovereignty
+
+- Users retain full sovereignty over their coach conversation records:
+  - Self-service history deletion (`DELETE /api/v1/coach/history`) instantly purges all user and assistant messages for that account.
+  - Account deletion cascade: Removing an account automatically deletes all associated `coach_messages` and `coach_insights` via PostgreSQL foreign-key cascade (`onDelete: Cascade`).

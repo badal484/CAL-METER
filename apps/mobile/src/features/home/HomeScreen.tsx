@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import type { RootTabParamList } from '../../app/navigation/types';
 import {
@@ -9,14 +9,17 @@ import {
   ProgressIndicator,
   MacroIndicator,
   Button,
+  IconButton,
 } from '../../components';
 import { useTheme } from '../../app/providers/ThemeProvider';
-import { Camera, Plus } from 'lucide-react-native';
+import { Camera, Plus, Sparkles, ChevronRight, X } from 'lucide-react-native';
+import { CoachScreen } from '../coach/CoachScreen';
 
 export const HomeScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors, typography, spacing, radii } = theme;
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
+  const [showCoachModal, setShowCoachModal] = useState<boolean>(false);
 
   // Mock data for preview milestone
   const dailyBudget = 2100;
@@ -137,7 +140,7 @@ export const HomeScreen: React.FC = () => {
 
       {/* Quick Action Shortcuts */}
       <SectionHeader title="Quick Actions" />
-      <View style={[styles.quickActions, { marginBottom: spacing.xl }]}>
+      <View style={[styles.quickActions, { marginBottom: spacing.md }]}>
         <View style={{ flex: 1, marginRight: spacing.sm }}>
           <Button
             title="Scan Meal"
@@ -155,6 +158,67 @@ export const HomeScreen: React.FC = () => {
           />
         </View>
       </View>
+
+      {/* AI Nutrition Coach Quick Banner */}
+      <Card
+        variant="elevated"
+        onPress={() => setShowCoachModal(true)}
+        style={{ marginBottom: spacing.xl }}
+        accessibilityLabel="Open AI Nutrition Coach"
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: radii.full,
+              backgroundColor: colors.surfaceMuted,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: spacing.md,
+            }}
+          >
+            <Sparkles size={18} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.titleSmall, { color: colors.textPrimary }]}>
+              AI Nutrition Coach
+            </Text>
+            <Text
+              style={[typography.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}
+              numberOfLines={1}
+            >
+              Ask questions, get meal ideas, and review today’s insights
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textTertiary} />
+        </View>
+      </Card>
+
+      {/* AI Nutrition Coach Modal */}
+      <Modal
+        visible={showCoachModal}
+        animationType="slide"
+        onRequestClose={() => setShowCoachModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.md,
+            }}
+          >
+            <IconButton
+              icon={<X size={20} color={colors.textPrimary} />}
+              onPress={() => setShowCoachModal(false)}
+              accessibilityLabel="Close AI Nutrition Coach"
+            />
+          </View>
+          <CoachScreen />
+        </View>
+      </Modal>
 
       {/* Recent Food Entries Preview */}
       <SectionHeader

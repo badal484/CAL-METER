@@ -360,3 +360,48 @@ sequenceDiagram
         Note over App,User: Exercise calories are NOT added to daily food calorie allowance
     end
 ```
+
+---
+
+## 8. Journey 7: AI Nutrition Coach & Personalized Insights Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant App as Mobile App (CoachScreen)
+    participant API as Backend API (/api/v1/coach)
+    participant DB as PostgreSQL Database
+    participant CoachAI as AI Coach Provider (Gemini / Mock)
+
+    User->>App: Opens AI Nutrition Coach from Home
+    App->>API: GET /coach/history & GET /coach/insights
+    API->>DB: Query CoachMessages & User Nutrition Logs
+    DB-->>API: Historical messages & daily logged totals
+    API->>API: Evaluate Deterministic Insights (Calories, Protein, Hydration, Weight Trend)
+    API-->>App: 200 OK (HistoryDto & InsightsResponseDto)
+    App->>User: Displays greeting, prompt chips, and today's evaluated insights
+
+    alt User asks nutrition question
+        User->>App: Selects chip or types "What should I eat for dinner?"
+        App->>API: POST /coach/message { message: "What should I eat for dinner?" }
+        API->>DB: Fetch anonymized context (Macros consumed vs target, diet preference)
+        API->>DB: Persist User CoachMessage (Role: USER)
+        API->>CoachAI: Dispatch chat with anonymized physiological context (NO PII)
+        CoachAI-->>API: Generated advice + suggested prompts
+        API->>DB: Persist Assistant CoachMessage (Role: ASSISTANT)
+        API-->>App: 200 OK (reply, messageId, suggestedPrompts, disclaimers)
+        App->>User: Renders assistant bubble with tailored advice & updated chips
+
+    else User requests meal recommendations
+        User->>App: Taps "Meal Ideas" tab (filters: Dinner, Vegetarian)
+        App->>API: GET /coach/recommendations?mealType=DINNER
+        API->>DB: Query UserProfile for dietPreference and active goals
+        API->>DB: Query canonical food database (Roti, Dal, Paneer, etc.)
+        API->>API: Scale portions deterministically to match remaining calorie budget
+        API-->>App: 200 OK (MealRecommendationsResponseDto)
+        App->>User: Displays tailored meal cards with item breakdown and calories
+        User->>App: Taps "Log This Meal"
+        App->>User: Confirms meal logged to daily diary
+    end
+```
