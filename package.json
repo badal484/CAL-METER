@@ -13,17 +13,24 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "build": "npm run build --workspace=@calmeter/shared && npm run build --workspace=@calmeter/contracts && npm run build --workspace=@calmeter/mobile",
-    "test": "npm run test --workspace=@calmeter/shared && npm run test --workspace=@calmeter/contracts && npm run test --workspace=@calmeter/mobile",
+    "build": "npm run build --workspace=@calmeter/shared && npm run build --workspace=@calmeter/contracts && npm run build --workspace=@calmeter/mobile && npm run build --workspace=@calmeter/api && npm run build --workspace=@calmeter/worker",
+    "test": "npm run test --workspace=@calmeter/shared && npm run test --workspace=@calmeter/contracts && npm run test --workspace=@calmeter/mobile && npm run test --workspace=@calmeter/api && npm run test --workspace=@calmeter/worker",
     "lint": "eslint .",
-    "typecheck": "npm run typecheck --workspace=@calmeter/shared && npm run typecheck --workspace=@calmeter/contracts && npm run typecheck --workspace=@calmeter/mobile",
+    "typecheck": "npm run typecheck --workspace=@calmeter/shared && npm run typecheck --workspace=@calmeter/contracts && npm run typecheck --workspace=@calmeter/mobile && npm run typecheck --workspace=@calmeter/api && npm run typecheck --workspace=@calmeter/worker",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "dev:api": "npm run dev --workspace=@calmeter/api",
+    "dev:worker": "npm run dev --workspace=@calmeter/worker",
+    "prisma:generate": "prisma generate --schema=infrastructure/prisma/schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema=infrastructure/prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema=infrastructure/prisma/schema.prisma",
+    "prisma:studio": "prisma studio --schema=infrastructure/prisma/schema.prisma"
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",
     "eslint": "^9.14.0",
     "prettier": "^3.3.3",
+    "prisma": "^6.4.1",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.13.0"
   }
