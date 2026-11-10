@@ -609,6 +609,9 @@ model MealEntry {
   totalProtein  Decimal        @default(0.00) @map("total_protein") @db.Decimal(8, 2)
   totalCarbs    Decimal        @default(0.00) @map("total_carbs") @db.Decimal(8, 2)
   totalFat      Decimal        @default(0.00) @map("total_fat") @db.Decimal(8, 2)
+  totalFiber    Decimal        @default(0.00) @map("total_fiber") @db.Decimal(8, 2)
+  totalSugar    Decimal        @default(0.00) @map("total_sugar") @db.Decimal(8, 2)
+  totalSodium   Decimal        @default(0.00) @map("total_sodium") @db.Decimal(8, 2)
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -633,6 +636,12 @@ model MealFoodItem {
   protein         Decimal      @db.Decimal(8, 2)
   carbs           Decimal      @db.Decimal(8, 2)
   fat             Decimal      @db.Decimal(8, 2)
+  fiber           Decimal?     @db.Decimal(8, 2)
+  sugar           Decimal?     @db.Decimal(8, 2)
+  sodium          Decimal?     @db.Decimal(8, 2)
+  micronutrients  Json         @default("{}")
+  scanId          String?      @map("scan_id") @db.Uuid
+  notes           String?      @db.VarChar(500)
   confidenceScore Decimal?     @map("confidence_score") @db.Decimal(3, 2)
   loggedMethod    LoggedMethod @default(SEARCH) @map("logged_method")
   createdAt       DateTime     @default(now()) @map("created_at")
@@ -640,8 +649,11 @@ model MealFoodItem {
 
   mealEntry       MealEntry    @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
   foodItem        FoodItem?    @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+  scan            FoodScanLog? @relation("ScanFoodItems", fields: [scanId], references: [id], onDelete: SetNull)
 
   @@index([mealEntryId])
+  @@index([foodItemId])
+  @@index([scanId])
   @@map("meal_food_items")
 }
 
@@ -677,6 +689,7 @@ model FoodScanLog {
 
   user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   mealEntry        MealEntry?  @relation(fields: [mealEntryId], references: [id], onDelete: SetNull)
+  mealItems        MealFoodItem[] @relation("ScanFoodItems")
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([mealEntryId])
@@ -770,6 +783,24 @@ ALTER TABLE "food_nutrient_profiles"
   ADD CONSTRAINT "chk_food_nutrient_profiles_protein_non_neg" CHECK ("protein" >= 0),
   ADD CONSTRAINT "chk_food_nutrient_profiles_carbs_non_neg" CHECK ("carbs" >= 0),
   ADD CONSTRAINT "chk_food_nutrient_profiles_fat_non_neg" CHECK ("fat" >= 0);
+
+-- Enforced via migration 20261110140000_food_diary_foundation
+ALTER TABLE "meal_entries"
+  ADD CONSTRAINT "chk_meal_entries_total_calories_non_neg" CHECK ("total_calories" >= 0),
+  ADD CONSTRAINT "chk_meal_entries_total_protein_non_neg" CHECK ("total_protein" >= 0),
+  ADD CONSTRAINT "chk_meal_entries_total_carbs_non_neg" CHECK ("total_carbs" >= 0),
+  ADD CONSTRAINT "chk_meal_entries_total_fat_non_neg" CHECK ("total_fat" >= 0),
+  ADD CONSTRAINT "chk_meal_entries_total_fiber_non_neg" CHECK ("total_fiber" >= 0),
+  ADD CONSTRAINT "chk_meal_entries_total_sugar_non_neg" CHECK ("total_sugar" >= 0),
+  ADD CONSTRAINT "chk_meal_entries_total_sodium_non_neg" CHECK ("total_sodium" >= 0);
+
+ALTER TABLE "meal_food_items"
+  ADD CONSTRAINT "chk_meal_food_items_portion_positive" CHECK ("portion_amount" > 0),
+  ADD CONSTRAINT "chk_meal_food_items_gram_weight_positive" CHECK ("gram_weight" > 0),
+  ADD CONSTRAINT "chk_meal_food_items_calories_non_neg" CHECK ("calories" >= 0),
+  ADD CONSTRAINT "chk_meal_food_items_protein_non_neg" CHECK ("protein" >= 0),
+  ADD CONSTRAINT "chk_meal_food_items_carbs_non_neg" CHECK ("carbs" >= 0),
+  ADD CONSTRAINT "chk_meal_food_items_fat_non_neg" CHECK ("fat" >= 0);
 ```
 
 ### 3.3. Indexing Strategy

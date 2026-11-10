@@ -76,8 +76,29 @@ describe('Nutrition Math Engine', () => {
     - `aiFoodMatching.test.ts`: Exact canonical match, Indian alias matching (_phulka_ -> Whole Wheat Roti), ambiguous match ranking, multi-tenant custom food isolation (User A custom food never matched for User B).
     - `aiNutritionCalculation.test.ts`: Deterministic calculation per 100g via `@calmeter/shared` formulas, serving unit conversion (piece, katori, cup), strict preservation of `null` vs `0` micronutrients, whole-meal nutrient aggregation, portion adjustment recalculations.
     - `aiScanWorkflow.test.ts`: End-to-end scan lifecycle REST API tests (`POST /scans`, image upload, process, corrections, diary confirmation, cancellation), daily quota gate (3 scans/day -> 429), multi-tenant 404 security barriers, idempotent diary confirmation.
+  - **Food Diary & Daily Nutrition Tracking Subsystem (`apps/api/tests/diary.test.ts`):**
+    - Empty diary initial state rendering with default zero totals.
+    - Logging items to Breakfast and Lunch with deterministic unit scaling (`piece`, `katori` to grams).
+    - Daily summary endpoint calculation against active `NutritionGoal` with consumed vs target and remaining macros.
+    - Immutable historical snapshot persistence (modifying food items in catalog does not alter past logged entries).
+    - Multi-tenant data isolation and anti-enumeration security: User A cannot read, modify, or delete User B's diary entries (`404 Not Found`).
+    - Logged item portion patch updates with atomic re-aggregation of meal totals.
+    - Logged item deletion with atomic recalculation of meal totals.
+    - Payload validation guards (invalid date formats, non-positive portions).
+    - Direct manual logging without `foodItemId` using custom nutritional values.
+    - Atomic transaction rollback on failure.
 
-### 2.3. End-to-End (E2E) Testing (Maestro & Detox)
+### 2.3. Mobile Component & Workflow Testing (`apps/mobile/tests/diary.test.tsx`)
+
+- **Test Runner:** Vitest + React Test Renderer with full design system mock environment.
+- **Scope:**
+  - Initial loading skeleton/spinner followed by daily summary card hydration.
+  - All four canonical meal sections (Breakfast, Lunch, Dinner, Snacks) rendered with food item rows and empty state placeholders.
+  - Calendar date navigation (Next day, Previous day, Jump to Today shortcut).
+  - Item deletion flow with confirmation dialog and automatic summary refresh.
+  - API failure error state rendering with accessible retry action.
+
+### 2.4. End-to-End (E2E) Testing (Maestro & Detox)
 
 - **Tool:** Maestro for cross-platform, declarative mobile UI flows.
 - **Core Critical Flows Tested:**

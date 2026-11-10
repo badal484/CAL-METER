@@ -140,18 +140,64 @@ flowchart TD
 ## 5. Journey 4: Historical Diary & Meal Adjustments
 
 ```mermaid
-flowchart LR
-    Dashboard[Dashboard] --> TapMeal[Tap on Lunch Card]
-    TapMeal --> MealDetails[Expand Meal Details Modal]
-    MealDetails --> EditItem[Tap Specific Food Item]
-    EditItem --> ChangePortion[Change 1 Roti to 2 Rotis]
-    ChangePortion --> AutoSave[Auto-Save & Re-calculate Meal Macros]
-    MealDetails --> SwipeDelete[Swipe Left on Item]
-    SwipeDelete --> ConfirmDelete[Delete Item & Update Day Ring]
+flowchart TD
+    Diary[Diary Screen] --> Nav{Date Navigation}
+    Nav -->|Prev / Next / Today| FetchDiary[Load GET /diary/:date & /diary/summary/:date]
+    FetchDiary --> SummaryCard[Render Consumed vs Target & Remaining Budget]
+    FetchDiary --> RenderMeals[Render 4 Meal Sections: Breakfast, Lunch, Dinner, Snacks]
+
+    RenderMeals --> ActionChoice{User Action}
+
+    ActionChoice -->|Tap '+ Add Food'| AddModal[Open Add Food Modal]
+    AddModal --> SearchCatalog[Debounced Search via GET /foods/search]
+    SearchCatalog --> PickFood[Select Food Item & Serving Unit]
+    PickFood --> LiveAddPreview[Live Nutrition Preview via scaleNutrients]
+    LiveAddPreview --> SubmitAdd[POST /diary/entries]
+    SubmitAdd --> RefreshDiary[Reload Diary & Summary State]
+
+    ActionChoice -->|Tap 'Edit' Icon| EditModal[Open Edit Portion Modal]
+    EditModal --> AdjustQty[Adjust Portion Steppers or Unit]
+    AdjustQty --> LiveEditPreview[Live Macro Preview via convertServingToGrams]
+    LiveEditPreview --> SubmitEdit[PATCH /diary/entries/:id]
+    SubmitEdit --> RefreshDiary
+
+    ActionChoice -->|Tap 'Delete' Icon| ConfirmAlert[Show Native Confirmation Alert]
+    ConfirmAlert -->|Confirm| SubmitDelete[DELETE /diary/entries/:id]
+    SubmitDelete --> RefreshDiary
 ```
 
-- **Date Switching:** Swipe left/right anywhere on the top calendar header to jump backward in time.
-- **Copying Meals:** Tap the three-dot menu on "Yesterday's Breakfast" -> "Copy to Today's Breakfast" for repeat meal routines.
+### Detailed Diary Interactions
+
+1. **Date Navigation:**
+   - Previous/Next icon buttons decrement/increment the displayed calendar day.
+   - When viewing any date other than the current calendar day, a **"Go to Today"** shortcut badge appears in the header.
+   - All dates are formatted canonically as `YYYY-MM-DD` and displayed with human-friendly headers (_"Today, 10 Nov"_, _"Yesterday, 9 Nov"_, or _"Fri, 12 Dec"_).
+
+2. **Daily Nutrition Summary Card:**
+   - Renders total calories consumed alongside the daily calorie goal.
+   - Displays a dynamic badge indicating remaining calorie budget or excess.
+   - Visualizes protein, carbs, and fat progress bars with individual target indicators and grams remaining.
+
+3. **Four Canonical Meal Slots:**
+   - Always renders `Breakfast`, `Lunch`, `Dinner`, and `Snacks` in fixed order.
+   - Each meal card displays its aggregate calorie subtotal and a quick `+` button.
+   - If empty, renders a clean monochrome placeholder (_"No food logged for breakfast."_).
+   - Logged items display the food name, portion amount, serving unit, gram weight, calories, and macro breakdown (P/C/F).
+
+4. **Add Food Flow:**
+   - Opens an accessible modal with search input, 300ms debounce, and auto-focus.
+   - Users can select from global catalog foods, verified regional items, or private custom foods.
+   - Configurable serving unit selector and quantity stepper (+/- 0.5 or direct numeric input).
+   - Live nutrition preview calculates calories, protein, carbs, and fat before submission using `@calmeter/shared`.
+
+5. **Edit Food Flow:**
+   - Allows fine-grained portion adjustments (+/- 0.5 increments) or serving unit modifications.
+   - Previews recalculated nutrients in real time.
+   - Updates the backend via `PATCH /diary/entries/:id` and atomically synchronizes the meal subtotal.
+
+6. **Delete Food Flow:**
+   - Tapping the delete icon prompts a destructive confirmation dialog.
+   - Upon confirmation, calls `DELETE /diary/entries/:id`, removing the item and updating the daily total without reloading full screen state.
 
 ---
 

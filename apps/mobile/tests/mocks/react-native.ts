@@ -185,6 +185,22 @@ export const ScrollView = React.forwardRef<
 );
 ScrollView.displayName = 'ScrollView';
 
+export const KeyboardAvoidingView = React.forwardRef<
+  unknown,
+  React.PropsWithChildren<Record<string, unknown>>
+>(({ children, ...props }, ref) =>
+  React.createElement('KeyboardAvoidingView', { ...props, ref }, children as React.ReactNode),
+);
+KeyboardAvoidingView.displayName = 'KeyboardAvoidingView';
+
+export const Modal = React.forwardRef<
+  unknown,
+  React.PropsWithChildren<{ visible?: boolean; [key: string]: unknown }>
+>(({ visible = true, children, ...props }, ref) =>
+  visible ? React.createElement('Modal', { ...props, ref }, children as React.ReactNode) : null,
+);
+Modal.displayName = 'Modal';
+
 export const StatusBar: React.FC<Record<string, unknown>> = () => null;
 
 export default {
@@ -203,5 +219,7 @@ export default {
   Switch,
   ActivityIndicator,
   ScrollView,
+  KeyboardAvoidingView,
+  Modal,
   StatusBar,
 };

@@ -670,8 +670,78 @@ Soft-deletes a user's own custom food item by marking `isArchived = true`.
 
 #### `GET /diary/:date`
 
-Fetches complete daily log for specified date (`YYYY-MM-DD`), including calorie budget calculations and individual meal breakdowns.
+Fetches the complete daily log for the specified date (`YYYY-MM-DD`), including daily nutrient totals, all four meal slots (`BREAKFAST`, `LUNCH`, `DINNER`, `SNACK`), and individual food items with their immutable historical nutrient snapshots.
 
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `date` (ISO date `YYYY-MM-DD`)
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "date": "2026-11-10",
+    "dailyTotals": {
+      "calories": 550.0,
+      "protein": 35.0,
+      "carbs": 75.0,
+      "fat": 12.0,
+      "fiber": 9.5,
+      "sugar": 3.8,
+      "sodium": 420.0,
+      "micronutrients": {
+        "calcium_mg": 140.0,
+        "iron_mg": 3.2
+      }
+    },
+    "meals": [
+      {
+        "id": "meal-entry-uuid-1",
+        "mealType": "BREAKFAST",
+        "date": "2026-11-10",
+        "notes": null,
+        "totalCalories": 240.0,
+        "totalProtein": 8.0,
+        "totalCarbs": 48.0,
+        "totalFat": 2.0,
+        "totalFiber": 6.0,
+        "totalSugar": 1.0,
+        "totalSodium": 180.0,
+        "items": [
+          {
+            "id": "mfi-uuid-1",
+            "foodItemId": "fd-roti-001",
+            "foodName": "Whole Wheat Roti",
+            "portionAmount": 2.0,
+            "servingUnit": "piece",
+            "gramWeight": 70.0,
+            "calories": 240.0,
+            "protein": 8.0,
+            "carbs": 48.0,
+            "fat": 2.0,
+            "fiber": 6.0,
+            "sugar": 1.0,
+            "sodium": 180.0,
+            "micronutrients": {},
+            "scanId": null,
+            "notes": null,
+            "loggedMethod": "SEARCH",
+            "createdAt": "2026-11-10T08:30:00.000Z",
+            "updatedAt": "2026-11-10T08:30:00.000Z"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `GET /diary/summary/:date`
+
+Calculates consumed nutrients against the user's active `NutritionGoal` on the specified date, deriving consumed vs target values and remaining calories/macros.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `date` (ISO date `YYYY-MM-DD`)
 - **Response `200 OK`:**
 
 ```json
@@ -680,50 +750,24 @@ Fetches complete daily log for specified date (`YYYY-MM-DD`), including calorie 
   "data": {
     "date": "2026-11-10",
     "calorieGoal": 2100,
-    "caloriesConsumed": 1450,
-    "caloriesRemaining": 650,
+    "caloriesConsumed": 550.0,
+    "caloriesRemaining": 1550.0,
     "macros": {
-      "protein": { "consumed": 110.5, "target": 150.0 },
-      "carbs": { "consumed": 160.2, "target": 220.0 },
-      "fat": { "consumed": 42.0, "target": 65.0 },
-      "fiber": { "consumed": 24.0, "target": 35.0 }
-    },
-    "meals": [
-      {
-        "id": "meal-entry-uuid-1",
-        "mealType": "BREAKFAST",
-        "totalCalories": 420.0,
-        "items": [
-          {
-            "id": "mfi-uuid-1",
-            "foodName": "Rolled Oats with Milk & Honey",
-            "portionAmount": 1.0,
-            "servingUnit": "bowl",
-            "gramWeight": 250,
-            "calories": 420.0,
-            "protein": 14.0,
-            "carbs": 68.0,
-            "fat": 7.0,
-            "loggedMethod": "SEARCH"
-          }
-        ]
-      },
-      {
-        "id": "meal-entry-uuid-2",
-        "mealType": "LUNCH",
-        "totalCalories": 1030.0,
-        "items": [ ... ]
-      }
-    ]
+      "protein": { "consumed": 35.0, "target": 140.0, "remaining": 105.0 },
+      "carbs": { "consumed": 75.0, "target": 220.0, "remaining": 145.0 },
+      "fat": { "consumed": 12.0, "target": 65.0, "remaining": 53.0 },
+      "fiber": { "consumed": 9.5, "target": 35.0, "remaining": 25.5 }
+    }
   }
 }
 ```
 
-#### `POST /diary/meals`
+#### `POST /diary/entries`
 
-Commits a verified meal (from AI scan or multi-item builder) to a meal slot.
+Logs one or more food items into a meal slot for a specific date. Food items can be linked to catalog items (`foodItemId`), AI scan records (`scanId`), or logged manually with custom macros. Servings are deterministically resolved against database conversion factors, nutrients are scaled via `@calmeter/shared`, immutable historical snapshots are saved, and meal totals are atomically re-computed.
 
-- **Request Body:**
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body (Zod Validated):**
 
 ```json
 {
@@ -732,33 +776,50 @@ Commits a verified meal (from AI scan or multi-item builder) to a meal slot.
   "notes": "Post-workout lunch",
   "items": [
     {
-      "foodItemId": "fd-indian-0042",
+      "foodItemId": "7f8b9c0d-1234-4567-89ab-cdef01234567",
       "foodName": "Yellow Dal Tadka",
       "portionAmount": 1.5,
       "servingUnit": "katori",
-      "gramWeight": 300,
-      "calories": 276.0,
-      "protein": 13.8,
-      "carbs": 36.75,
-      "fat": 8.4,
-      "loggedMethod": "AI_PHOTO",
-      "confidenceScore": 0.94
+      "loggedMethod": "SEARCH"
     }
   ]
 }
 ```
 
-#### `PUT /diary/items/:itemId`
+- **Response `201 Created`:** Returns complete `MealEntryResponseDto` including created food item snapshots and updated meal totals.
 
-Updates the portion amount or serving unit of an existing logged food item. Automatically re-computes parent meal and daily totals.
+#### `GET /diary/entries/:id`
 
-#### `DELETE /diary/items/:itemId`
+Retrieves a single logged food item by ID with multi-tenant ownership enforcement.
 
-Deletes an individual food item.
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID of `MealFoodItem`)
+- **Tenant Protection:** Returns `404 Not Found` if item does not exist or belongs to another user.
+- **Response `200 OK`:** Returns `MealFoodItemDto`.
 
-#### `DELETE /diary/meals/:id`
+#### `PATCH /diary/entries/:id`
 
-Deletes an entire meal slot for that day.
+Updates the portion amount, serving unit, meal slot, or food item of an existing logged item. Re-converts weights, scales nutrients, and atomically recalculates the parent meal's total calories and macros.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID of `MealFoodItem`)
+- **Request Body:** Partial `UpdateMealFoodItemRequestSchema` (e.g. `{ "portionAmount": 2.0, "servingUnit": "katori" }`).
+- **Response `200 OK`:** Returns updated `MealFoodItemDto`.
+
+#### `DELETE /diary/entries/:id`
+
+Deletes a logged food item and atomically recalculates the parent meal's totals. If no items remain in the meal slot, the meal totals are safely reset to zero.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID of `MealFoodItem`)
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": { "message": "Meal food item deleted successfully." }
+}
+```
 
 ---
 

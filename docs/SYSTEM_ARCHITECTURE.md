@@ -225,6 +225,45 @@ sequenceDiagram
     Client->>API: POST /api/v1/diary/meals/items
 ```
 
+### 4.3. Food Diary Logging & Nutrition Snapshot Architecture
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (Mobile Client)
+    participant Client as React Native Diary
+    participant API as Express API (DiaryService)
+    participant Shared as @calmeter/shared
+    participant DB as PostgreSQL 16 (Prisma $transaction)
+
+    User->>Client: Searches food & enters serving/quantity
+    Client->>API: POST /api/v1/diary/entries { date, mealType, items }
+    API->>DB: Find or create MealEntry for (userId, date, mealType)
+    loop For each logged food item
+        alt foodItemId provided
+            API->>DB: Fetch food item, serving conversions & nutrient profile
+            API->>Shared: convertServingToGrams(conversions, unit, portion)
+            API->>Shared: scaleNutrients(nutrientProfile, calculatedGrams)
+        else Manual entry with direct macros
+            API->>API: Use provided portion, gram weight & macros
+        end
+        API->>DB: INSERT into meal_food_items (Historical Snapshot)
+    end
+    API->>DB: Atomically recalculate and UPDATE meal_entries totals (calories, macros, fiber, sugar, sodium)
+    DB-->>API: Transaction committed
+    API-->>Client: 201 Created (MealEntry + Snapshots)
+    Client->>User: Updates Daily Summary Card and Meal Cards
+```
+
+#### Nutrition Snapshot Immutability Principle
+
+To guarantee scientific tracking integrity over time:
+
+1. **No Dynamic Joins for Historical Nutrition:** Historical meal calculations never dynamically join against live `food_items` records for past nutrients. Instead, the exact scaled nutrient profile (calories, protein, carbs, fat, fiber, sugar, sodium, micronutrients JSON) is permanently captured on `meal_food_items`.
+2. **Catalog Modification Resilience:** If a food manufacturer changes a recipe or an admin updates a catalog entry, past logged days remain mathematically unchanged.
+3. **Atomic Meal Aggregate Synchronization:** All additions, portion patches, and item deletions occur within an isolated Prisma `$transaction` that automatically recalculates parent `meal_entries` totals, maintaining ACID consistency.
+4. **Preservation of Null vs Zero:** Micronutrients that are unmeasured in source databases are strictly retained as `null` (or omitted from the micronutrient dictionary) rather than coerced to `0`, preventing deceptive clinical conclusions.
+
 ---
 
 ## 5. Synchronous vs Asynchronous Workload Isolation

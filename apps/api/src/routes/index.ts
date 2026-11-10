@@ -4,6 +4,7 @@ import { healthRouter } from './health.routes.js';
 import { createAuthRouter } from './auth.routes.js';
 import { createFoodRouter } from './food.routes.js';
 import { createScanRouter } from './scan.routes.js';
+import { createDiaryRouter } from './diary.routes.js';
 import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 
 export interface RouteOptions {
@@ -27,6 +28,10 @@ export function createRootRouter(options?: RouteOptions): Router {
   v1Router.use(
     '/scans',
     createScanRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/diary',
+    createDiaryRouter({ verifier: options?.verifier, prisma: options?.prisma }),
   );
 
   rootRouter.use('/api/v1', v1Router);
