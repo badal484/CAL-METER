@@ -29,3 +29,4 @@ export * from './utils/measurements.js';
 export * from './utils/barcode.js';
 export * from './utils/timezone.js';
 export * from './utils/analyticsSanitizer.js';
+export * from './utils/adminPermissions.js';

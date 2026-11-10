@@ -1703,3 +1703,174 @@ http_requests_total{service="calmeter_api"} 1420
 http_request_duration_ms{service="calmeter_api",quantile="avg"} 28.5
 http_request_duration_ms{service="calmeter_api",quantile="p95"} 85.0
 ```
+
+---
+
+### Module 14: Web Admin Panel & Operations API (Part 14)
+
+Base URL: `/api/v1/admin`
+
+#### RBAC Authorization Model
+
+All administrative endpoints require bearer token authentication validated against `admin_users`. Operations are guarded by 4 role ranks:
+
+1. `SUPPORT_ADMIN`: Read-only users/scans/dashboard, support ticket management.
+2. `NUTRITION_EDITOR`: Food database and recipe catalog curation.
+3. `OPERATIONS_ADMIN`: User suspensions, scan retries, campaigns, webhook reconciliation, queue inspection, audit logs.
+4. `SUPER_ADMIN`: Administrator provisioning, role changes, account status governance.
+
+#### 14.1. `GET /api/v1/admin/me`
+
+Returns the authenticated administrator profile, role, and active status.
+
+- **Authentication:** Any valid active administrator
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "admin-uuid",
+    "firebaseUid": "fb-super-admin",
+    "email": "superadmin@calmeter.app",
+    "name": "Chief Administrator",
+    "role": "SUPER_ADMIN",
+    "isActive": true
+  }
+}
+```
+
+#### 14.2. `GET /api/v1/admin/dashboard/overview`
+
+Aggregated operational telemetry, conversion rates, product counters, and trend series.
+
+- **RBAC:** `SUPPORT_ADMIN` or above
+- **Response (`200 OK`, `AdminDashboardOverview`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "business": {
+      "totalUsers": 12500,
+      "dailyActiveUsers": 3400,
+      "weeklyActiveUsers": 8200,
+      "monthlyActiveUsers": 11800,
+      "newRegistrationsToday": 142,
+      "freeUsers": 11450,
+      "premiumSubscribers": 1050,
+      "activeSubscriptions": 1050,
+      "conversionRatePercent": 8.4,
+      "mrrEstimateUsd": 10489.5,
+      "churnRatePercent": 1.8
+    },
+    "product": {
+      "dailyDiaryEntries": 4820,
+      "photoScansTotal": 29400,
+      "barcodeScansTotal": 14200,
+      "coachMessagesTotal": 8900,
+      "mealRecommendationsTotal": 3100
+    },
+    "operational": {
+      "apiUptimeSeconds": 86400,
+      "avgLatencyMs": 24.5,
+      "p95LatencyMs": 85.0,
+      "errorRatePercent": 0.05,
+      "databaseStatus": "healthy",
+      "redisStatus": "healthy",
+      "workerActiveJobs": 2,
+      "workerFailedJobs": 0,
+      "workerQueueDepth": 5,
+      "aiTotalTokens": 4250000,
+      "aiEstimatedCostUsd": 0.6375,
+      "aiFailureCount": 4
+    },
+    "generatedAt": "2026-11-10T18:00:00.000Z",
+    "trendSeries": [{ "date": "2026-11-01", "signups": 110, "scans": 950, "meals": 3200 }]
+  }
+}
+```
+
+#### 14.3. `GET /api/v1/admin/users` & `GET /api/v1/admin/users/:id`
+
+Searches user directory and retrieves comprehensive profile, goals, and history.
+
+- **Query Parameters:** `page`, `limit`, `search`, `status` (`all`|`active`|`suspended`), `tier` (`all`|`free`|`premium`)
+- **RBAC:** `SUPPORT_ADMIN` or above
+
+#### 14.4. `POST /api/v1/admin/users/:id/suspend` & `POST /api/v1/admin/users/:id/reactivate`
+
+Suspends or reactivates a user account with mandatory operator audit justification.
+
+- **RBAC:** `OPERATIONS_ADMIN` or above
+- **Request Body (`SuspendUserInput`):**
+
+```json
+{
+  "reason": "Policy violation: Automated spam queries detected."
+}
+```
+
+#### 14.5. `GET /api/v1/admin/foods`, `POST /foods`, `PATCH /foods/:id`, `DELETE /foods/:id`
+
+Full CRUD and verification control over regional and packaged food items.
+
+- **RBAC:** `NUTRITION_EDITOR` or above
+- **Request Body (`CreateFoodItem`):**
+
+```json
+{
+  "name": "Tandoori Roti",
+  "cuisine": "INDIAN_NORTH",
+  "servingSize": 60,
+  "servingUnit": "piece",
+  "calories": 140,
+  "proteinG": 4.5,
+  "carbsG": 28.0,
+  "fatG": 1.0,
+  "fiberG": 3.0,
+  "isVerified": true
+}
+```
+
+#### 14.6. `GET /api/v1/admin/scans`, `POST /scans/:id/retry`
+
+Inspects failed or pending food scans and resets jobs for safe pipeline retry.
+
+- **RBAC:** List (`SUPPORT_ADMIN`), Retry (`OPERATIONS_ADMIN`)
+
+#### 14.7. `GET /api/v1/admin/ai/telemetry`
+
+Detailed token usage, latency averages, failure counts, and provider breakdown.
+
+- **RBAC:** `OPERATIONS_ADMIN` or above
+
+#### 14.8. `GET /api/v1/admin/subscriptions`, `POST /subscriptions/:id/reconcile`
+
+Inspects subscriber status, lists RevenueCat webhook event history, and triggers manual reconciliation.
+
+- **RBAC:** List (`SUPPORT_ADMIN`), Webhooks & Reconcile (`OPERATIONS_ADMIN`)
+
+#### 14.9. `GET /api/v1/admin/campaigns`, `POST /campaigns`, `POST /campaigns/:id/dispatch`, `POST /campaigns/test`
+
+Manages notification campaigns and dispatches test pushes to verify FCM delivery.
+
+- **RBAC:** `OPERATIONS_ADMIN` or above
+
+#### 14.10. `GET /api/v1/admin/tickets`, `POST /tickets`, `PATCH /tickets/:id`, `POST /tickets/:id/notes`
+
+Manages customer support ticket lifecycles and internal communication threads.
+
+- **RBAC:** `SUPPORT_ADMIN` or above
+
+#### 14.11. `GET /api/v1/admin/admins`, `POST /admins`, `PATCH /admins/:id/role`, `PATCH /admins/:id/status`
+
+Super Administrator governance zone for provisioning and managing operator accounts.
+
+- **RBAC:** `SUPER_ADMIN` strictly
+
+#### 14.12. `GET /api/v1/admin/audit-logs`
+
+Paginated listing of immutable security audit logs with operator identity, IP, and state mutation details.
+
+- **RBAC:** `OPERATIONS_ADMIN` or above

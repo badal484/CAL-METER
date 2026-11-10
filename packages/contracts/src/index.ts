@@ -12,3 +12,4 @@ export * from './subscription.contract.js';
 export * from './notification.contract.js';
 export * from './analytics.contract.js';
 export * from './metrics.contract.js';
+export * from './admin.contract.js';

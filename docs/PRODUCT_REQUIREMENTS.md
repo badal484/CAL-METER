@@ -310,3 +310,27 @@ _Note: Latency and throughput figures represent unverified engineering design ta
 - **FR-17.1 (Graceful Degradation):** If Redis or external AI providers experience outages, core diary logging and PostgreSQL food search operations continue functioning without throwing 500 errors.
 - **FR-17.2 (Tiered Rate Limiting):** Protects API endpoints against brute force and abuse with sliding-window throttles with automatic fallback to memory in event of cache unavailability.
 - **FR-17.3 (Operational Observability):** Real-time monitoring endpoints (`GET /health/metrics` and `GET /metrics`) surface P95 latency percentiles, memory consumption, HTTP status distribution, AI token consumption, and background worker queue depths in Prometheus and JSON formats.
+
+---
+
+## 18. Web Admin Panel & Operations Dashboard (Part 14)
+
+### 18.1. Objective
+
+Provide the CAL METER engineering, nutrition, and operations teams with a centralized, secure web dashboard to monitor application performance, govern user accounts, curate food catalog items, troubleshoot AI failures, manage subscription entitlements, and maintain audit transparency.
+
+### 18.2. Functional Requirements
+
+- **FR-18.1 (Role-Based Access Control):** Four administrative roles strictly enforced on the server:
+  - `SUPPORT_ADMIN`: Customer ticket resolution, read-only user inspection, read-only scan logs.
+  - `NUTRITION_EDITOR`: Food database curation, verified catalog additions, recipe authoring.
+  - `OPERATIONS_ADMIN`: User suspensions, scan retries, push notification campaigns, subscription webhook reconciliations, system health monitoring, audit log inspection.
+  - `SUPER_ADMIN`: Provisioning new admin accounts, role management, admin disabling/enabling.
+- **FR-18.2 (Executive & Telemetry Dashboard):** Visual dashboard displaying real-time business KPIs (Total users, Premium subscribers, MRR, Conversion rate), product engagement counters (Daily meals, Scans, Barcode lookups, Coach dialogues), and infrastructure health (Latencies, DB/Redis status, BullMQ queue depth, AI token expenditures).
+- **FR-18.3 (User Account Governance):** Search and filter user accounts. View nutrition profiles and streaks. Support suspend and reactivate workflows with mandatory justification reason.
+- **FR-18.4 (Food Catalog & Recipe Curation):** Search and filter catalog foods by regional cuisine and verification status. Create, edit, and archive foods with accurate serving weights and macros. Author and publish healthy regional recipes.
+- **FR-18.5 (AI Scan Debugger & Safe Retries):** Filter failed scan logs. Inspect raw model response payloads and token metrics. Safely trigger job reprocessing.
+- **FR-18.6 (Subscription Entitlement Reconciliation):** View user subscription tiers, audit RevenueCat webhooks, and trigger manual entitlement reconciliations.
+- **FR-18.7 (Push Campaigns & Broadcasts):** Compose targeted notifications, schedule dispatches, and trigger test pushes to devices.
+- **FR-18.8 (Customer Support Ticketing):** Manage support tickets with priority and status filters, and maintain internal operator communication threads.
+- **FR-18.9 (Immutable Security Audit Ledger):** Record an append-only audit trail for every administrative mutation including actor identity, remote IP, and mutation details.

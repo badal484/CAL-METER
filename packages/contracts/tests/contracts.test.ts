@@ -1630,4 +1630,233 @@ describe('Contracts Runtime Schema Validation', () => {
       expect(OperationalMetricsResponseSchema.safeParse(metric).success).toBe(true);
     });
   });
+
+  describe('Notifications & Reminders Contracts (Part 13)', () => {
+    it('validates RegisterDeviceTokenSchema', async () => {
+      const { RegisterDeviceTokenSchema } = await import('../src/notification.contract.js');
+      const { DevicePlatform } = await import('@calmeter/shared');
+
+      const payload = {
+        token: 'fcm-device-registration-token-valid-length-1234567890',
+        platform: DevicePlatform.ANDROID,
+        deviceModel: 'Pixel 8 Pro',
+        osVersion: 'Android 14',
+        appVersion: '1.0.0',
+      };
+
+      expect(RegisterDeviceTokenSchema.safeParse(payload).success).toBe(true);
+    });
+
+    it('validates NotificationPreferenceSchema defaults and custom reminder times', async () => {
+      const { NotificationPreferenceSchema } = await import('../src/notification.contract.js');
+
+      const payload = {
+        enabled: true,
+        mealReminders: true,
+        breakfastReminder: true,
+        lunchReminder: true,
+        dinnerReminder: true,
+        waterReminders: true,
+        dailySummary: true,
+        weeklySummary: true,
+        weightReminders: true,
+        coachInsights: true,
+        subscriptionUpdates: true,
+        breakfastTime: '08:30',
+        lunchTime: '13:00',
+        dinnerTime: '20:00',
+        dailySummaryTime: '21:30',
+        weightReminderTime: '08:00',
+        weeklySummaryDay: 0,
+        waterIntervalHours: 2,
+        waterStartTime: '09:00',
+        waterEndTime: '21:00',
+        quietHoursStart: '22:00',
+        quietHoursEnd: '07:00',
+        timezone: 'Asia/Kolkata',
+      };
+
+      const result = NotificationPreferenceSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects invalid time formats for notification preferences', async () => {
+      const { NotificationPreferenceSchema } = await import('../src/notification.contract.js');
+
+      const invalid = {
+        breakfastTime: '25:00', // invalid hour
+      };
+
+      expect(NotificationPreferenceSchema.safeParse(invalid).success).toBe(false);
+    });
+  });
+
+  describe('Product Analytics Contracts (Part 13)', () => {
+    it('validates TrackAnalyticsEventSchema and BatchAnalyticsEventsSchema', async () => {
+      const { TrackAnalyticsEventSchema, BatchAnalyticsEventsSchema } = await import('../src/analytics.contract.js');
+      const { AnalyticsEventName } = await import('@calmeter/shared');
+
+      const single = {
+        eventName: AnalyticsEventName.DIARY_ENTRY_CREATED,
+        properties: { mealType: 'LUNCH', calories: 540 },
+        devicePlatform: 'ANDROID',
+        appVersion: '1.0.0',
+        sessionId: 'sess_123',
+      };
+
+      expect(TrackAnalyticsEventSchema.safeParse(single).success).toBe(true);
+
+      const batch = {
+        events: [single],
+      };
+
+      expect(BatchAnalyticsEventsSchema.safeParse(batch).success).toBe(true);
+    });
+  });
+
+  describe('Operational Metrics Contracts (Part 13)', () => {
+    it('validates OperationalMetricsResponseSchema structure', async () => {
+      const { OperationalMetricsResponseSchema } = await import('../src/metrics.contract.js');
+
+      const metric = {
+        service: 'calmeter-api',
+        version: '1.0.0',
+        environment: 'test',
+        timestamp: '2026-11-10T12:00:00.000Z',
+        uptimeSeconds: 3600,
+        memoryUsage: {
+          heapUsedMb: 64.2,
+          heapTotalMb: 128.0,
+          rssMb: 180.5,
+        },
+        httpMetrics: {
+          totalRequests: 1500,
+          statusCodes: { '200': 1480, '404': 15, '500': 5 },
+          averageLatencyMs: 45.2,
+          p95LatencyMs: 120.0,
+        },
+        workerMetrics: {
+          activeJobs: 2,
+          completedJobs: 140,
+          failedJobs: 1,
+          waitingJobs: 0,
+        },
+        aiMetrics: {
+          requestCount: 50,
+          totalTokens: 15400,
+          promptTokens: 12000,
+          completionTokens: 3400,
+          averageLatencyMs: 650.0,
+        },
+      };
+
+      expect(OperationalMetricsResponseSchema.safeParse(metric).success).toBe(true);
+    });
+  });
+
+  describe('Web Admin Panel & Operations Contracts (Part 14)', () => {
+    it('validates ProvisionAdminInputSchema and UpdateAdminRoleInputSchema', async () => {
+      const { ProvisionAdminInputSchema, UpdateAdminRoleInputSchema } = await import('../src/admin.contract.js');
+      const { AdminRole } = await import('@calmeter/shared');
+
+      const provisionPayload = {
+        email: 'ops-lead@calmeter.internal',
+        name: 'Operations Lead',
+        role: AdminRole.OPERATIONS_ADMIN,
+      };
+
+      expect(ProvisionAdminInputSchema.safeParse(provisionPayload).success).toBe(true);
+
+      const updateRolePayload = {
+        role: AdminRole.SUPER_ADMIN,
+      };
+
+      expect(UpdateAdminRoleInputSchema.safeParse(updateRolePayload).success).toBe(true);
+    });
+
+    it('validates AdminDashboardOverviewSchema structure', async () => {
+      const { AdminDashboardOverviewSchema } = await import('../src/admin.contract.js');
+
+      const dashboard = {
+        business: {
+          totalUsers: 12500,
+          dailyActiveUsers: 3400,
+          weeklyActiveUsers: 7800,
+          monthlyActiveUsers: 11200,
+          newRegistrationsToday: 145,
+          freeUsers: 11000,
+          premiumSubscribers: 1500,
+          activeSubscriptions: 1480,
+          conversionRatePercent: 12.0,
+          mrrEstimateUsd: 14800.0,
+          churnRatePercent: 2.1,
+        },
+        product: {
+          dailyDiaryEntries: 8900,
+          photoScansTotal: 4200,
+          barcodeScansTotal: 1800,
+          coachMessagesTotal: 3100,
+          mealRecommendationsTotal: 950,
+        },
+        operational: {
+          apiUptimeSeconds: 86400,
+          avgLatencyMs: 35.2,
+          p95LatencyMs: 95.0,
+          errorRatePercent: 0.05,
+          databaseStatus: 'HEALTHY',
+          redisStatus: 'HEALTHY',
+          workerActiveJobs: 2,
+          workerFailedJobs: 0,
+          workerQueueDepth: 1,
+          aiTotalTokens: 250000,
+          aiEstimatedCostUsd: 12.5,
+          aiFailureCount: 1,
+        },
+        generatedAt: '2026-11-10T12:00:00.000Z',
+      };
+
+      expect(AdminDashboardOverviewSchema.safeParse(dashboard).success).toBe(true);
+    });
+
+    it('validates CreateRecipeInputSchema and CreateSupportTicketInputSchema', async () => {
+      const { CreateRecipeInputSchema, CreateSupportTicketInputSchema } = await import('../src/admin.contract.js');
+      const { SupportTicketCategory, SupportTicketPriority } = await import('@calmeter/shared');
+
+      const recipe = {
+        title: 'High-Protein Paneer Bhurji',
+        description: 'Nutritious scrambled cottage cheese with bell peppers and cumin',
+        cuisine: 'INDIAN_NORTH',
+        dietaryTags: ['VEGETARIAN', 'HIGH_PROTEIN'],
+        servings: 2,
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15,
+        difficulty: 'EASY',
+        instructions: ['Heat oil in a pan', 'Saute onions and cumin', 'Crumble fresh paneer and serve'],
+        ingredients: [
+          { name: 'Paneer', amount: '200g', calories: 530 },
+          { name: 'Onion', amount: '1 medium', calories: 45 },
+        ],
+        caloriesPerServing: 287.5,
+        proteinPerServing: 18.0,
+        carbsPerServing: 6.5,
+        fatPerServing: 20.0,
+        fiberPerServing: 2.0,
+        isPublished: true,
+      };
+
+      expect(CreateRecipeInputSchema.safeParse(recipe).success).toBe(true);
+
+      const ticket = {
+        userEmail: 'user@example.com',
+        category: SupportTicketCategory.AI_SCAN_FAILURE,
+        priority: SupportTicketPriority.HIGH,
+        subject: 'Photo scan failed on masala dosa',
+        message: 'The photo scan reported an unrecognized dish with 0 confidence.',
+      };
+
+      expect(CreateSupportTicketInputSchema.safeParse(ticket).success).toBe(true);
+    });
+  });
 });
+
+

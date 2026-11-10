@@ -13,14 +13,15 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "build": "npm run build --workspace=@calmeter/shared && npm run build --workspace=@calmeter/contracts && npm run build --workspace=@calmeter/mobile && npm run build --workspace=@calmeter/api && npm run build --workspace=@calmeter/worker",
-    "test": "npm run test --workspace=@calmeter/shared && npm run test --workspace=@calmeter/contracts && npm run test --workspace=@calmeter/mobile && npm run test --workspace=@calmeter/api && npm run test --workspace=@calmeter/worker",
+    "build": "npm run build --workspace=@calmeter/shared && npm run build --workspace=@calmeter/contracts && npm run build --workspace=@calmeter/mobile && npm run build --workspace=@calmeter/api && npm run build --workspace=@calmeter/worker && npm run build --workspace=@calmeter/admin",
+    "test": "npm run test --workspace=@calmeter/shared && npm run test --workspace=@calmeter/contracts && npm run test --workspace=@calmeter/mobile && npm run test --workspace=@calmeter/api && npm run test --workspace=@calmeter/worker && npm run test --workspace=@calmeter/admin",
     "lint": "eslint .",
-    "typecheck": "npm run typecheck --workspace=@calmeter/shared && npm run typecheck --workspace=@calmeter/contracts && npm run typecheck --workspace=@calmeter/mobile && npm run typecheck --workspace=@calmeter/api && npm run typecheck --workspace=@calmeter/worker",
+    "typecheck": "npm run typecheck --workspace=@calmeter/shared && npm run typecheck --workspace=@calmeter/contracts && npm run typecheck --workspace=@calmeter/mobile && npm run typecheck --workspace=@calmeter/api && npm run typecheck --workspace=@calmeter/worker && npm run typecheck --workspace=@calmeter/admin",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "dev:api": "npm run dev --workspace=@calmeter/api",
     "dev:worker": "npm run dev --workspace=@calmeter/worker",
+    "dev:admin": "npm run dev --workspace=@calmeter/admin",
     "prisma:generate": "DATABASE_URL=\"${DATABASE_URL:-postgresql://calmeter:calmeter@localhost:5432/calmeter_dev}\" prisma generate --schema=infrastructure/prisma/schema.prisma",
     "prisma:validate": "DATABASE_URL=\"${DATABASE_URL:-postgresql://calmeter:calmeter@localhost:5432/calmeter_dev}\" prisma validate --schema=infrastructure/prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --schema=infrastructure/prisma/schema.prisma",
@@ -35,5 +36,9 @@
     "prisma": "^6.4.1",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.13.0"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   }
 }

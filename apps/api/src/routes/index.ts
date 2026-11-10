@@ -15,6 +15,7 @@ import { createWebhookRouter } from './webhook.routes.js';
 import { createNotificationRoutes } from './notification.routes.js';
 import { createAnalyticsRoutes } from './analytics.routes.js';
 import { createMetricsRoutes } from './metrics.routes.js';
+import { createAdminRoutes } from './admin.routes.js';
 import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 import type { BarcodeLookupService } from '../services/barcode/barcodeLookup.service.js';
 import type { IPushNotificationProvider } from '../services/notificationDispatcher.service.js';
@@ -29,6 +30,7 @@ export interface RouteOptions {
   webhookRouter?: Router;
   notificationRouter?: Router;
   analyticsRouter?: Router;
+  adminRouter?: Router;
   pushProvider?: IPushNotificationProvider;
 }
 
@@ -106,6 +108,15 @@ export function createRootRouter(options?: RouteOptions): Router {
       }),
   );
   v1Router.use('/metrics', createMetricsRoutes());
+  v1Router.use(
+    '/admin',
+    options?.adminRouter ||
+      createAdminRoutes({
+        verifier: options?.verifier,
+        prisma: options?.prisma,
+        pushProvider: options?.pushProvider,
+      }),
+  );
 
   rootRouter.use('/api/v1', v1Router);
 

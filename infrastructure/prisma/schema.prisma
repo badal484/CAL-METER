@@ -246,6 +246,46 @@ enum AnalyticsEventName {
   EXERCISE_LOGGED
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  OPERATIONS_ADMIN
+  NUTRITION_EDITOR
+  SUPPORT_ADMIN
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_USER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketCategory {
+  ACCOUNT_BILLING
+  FOOD_DATABASE
+  AI_SCAN_FAILURE
+  BUG_REPORT
+  FEATURE_REQUEST
+  GENERAL_INQUIRY
+}
+
+enum NotificationCampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
 // -------------------------------------------------------------
 // MODELS
 // -------------------------------------------------------------
@@ -256,6 +296,9 @@ model User {
   email        String?     @unique
   name         String?
   role         UserRole    @default(USER)
+  isSuspended  Boolean     @default(false) @map("is_suspended")
+  suspendedAt  DateTime?   @map("suspended_at") @db.Timestamptz(6)
+  suspensionReason String? @map("suspension_reason") @db.Text
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
   deletedAt    DateTime?   @map("deleted_at")
@@ -278,10 +321,13 @@ model User {
   analyticsEvents AnalyticsEvent[]
   customFoods  FoodItem[]        @relation("UserCustomFoods")
   deletionReq  DeletionRequest?
+  supportTickets SupportTicket[]
 
   @@index([deletedAt])
+  @@index([isSuspended])
   @@map("users")
 }
+
 
 model UserProfile {
   id              String         @id @default(uuid()) @db.Uuid
@@ -429,6 +475,8 @@ model FoodItem {
   mealFoodItems       MealFoodItem[]
   recipeIngredients   FoodIngredient[]        @relation("ParentRecipe")
   usedAsIngredientIn  FoodIngredient[]        @relation("IngredientItem")
+  recipes             Recipe[]
+
 
   @@index([name])
   @@index([barcode])
@@ -897,5 +945,140 @@ model AnalyticsEvent {
   @@index([eventName, timestamp(sort: Desc)])
   @@map("analytics_events")
 }
+
+model AdminUser {
+  id          String      @id @default(uuid()) @db.Uuid
+  firebaseUid String      @unique @map("firebase_uid")
+  email       String      @unique
+  name        String
+  role        AdminRole   @default(SUPPORT_ADMIN)
+  isActive    Boolean     @default(true) @map("is_active")
+  lastLoginAt DateTime?   @map("last_login_at") @db.Timestamptz(6)
+  createdBy   String?     @map("created_by") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auditLogs   AdminAuditLog[]
+  assignedTickets SupportTicket[] @relation("AssignedTickets")
+  ticketNotes SupportTicketNote[]
+  campaigns   NotificationCampaign[]
+
+  @@index([role, isActive])
+  @@map("admin_users")
+}
+
+model AdminAuditLog {
+  id             String    @id @default(uuid()) @db.Uuid
+  adminId        String    @map("admin_id") @db.Uuid
+  action         String    @db.VarChar(100)
+  targetResource String    @map("target_resource") @db.VarChar(100)
+  targetId       String?   @map("target_id") @db.VarChar(100)
+  details        Json?     @db.JsonB
+  reason         String?   @db.Text
+  ipAddress      String?   @map("ip_address") @db.VarChar(45)
+  userAgent      String?   @map("user_agent") @db.VarChar(255)
+  requestId      String?   @map("request_id") @db.VarChar(100)
+  status         String    @default("SUCCESS") @db.VarChar(20)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  admin          AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetResource, targetId])
+  @@map("admin_audit_logs")
+}
+
+model SupportTicket {
+  id              String                @id @default(uuid()) @db.Uuid
+  userId          String?               @map("user_id") @db.Uuid
+  userEmail       String?               @map("user_email") @db.VarChar(255)
+  category        SupportTicketCategory @default(GENERAL_INQUIRY)
+  priority        SupportTicketPriority @default(MEDIUM)
+  status          SupportTicketStatus   @default(OPEN)
+  subject         String                @db.VarChar(200)
+  message         String                @db.Text
+  assignedAdminId String?               @map("assigned_admin_id") @db.Uuid
+  resolutionNotes String?               @map("resolution_notes") @db.Text
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignedAdmin   AdminUser?            @relation("AssignedTickets", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  notes           SupportTicketNote[]
+
+  @@index([status, priority])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([assignedAdminId, status])
+  @@map("support_tickets")
+}
+
+model SupportTicketNote {
+  id        String        @id @default(uuid()) @db.Uuid
+  ticketId  String        @map("ticket_id") @db.Uuid
+  adminId   String        @map("admin_id") @db.Uuid
+  note      String        @db.Text
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  admin     AdminUser     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt(sort: Asc)])
+  @@map("support_ticket_notes")
+}
+
+model NotificationCampaign {
+  id             String                     @id @default(uuid()) @db.Uuid
+  title          String                     @db.VarChar(200)
+  body           String                     @db.Text
+  category       NotificationCategory       @default(DAILY_SUMMARY)
+  deepLink       String?                    @map("deep_link") @db.VarChar(255)
+  targetAudience String                     @default("ALL") @map("target_audience") @db.VarChar(50)
+  status         NotificationCampaignStatus @default(DRAFT)
+  scheduledAt    DateTime?                  @map("scheduled_at") @db.Timestamptz(6)
+  sentAt         DateTime?                  @map("sent_at") @db.Timestamptz(6)
+  totalTargeted  Int                        @default(0) @map("total_targeted")
+  totalSent      Int                        @default(0) @map("total_sent")
+  totalFailed    Int                        @default(0) @map("total_failed")
+  createdById    String?                    @map("created_by_id") @db.Uuid
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdBy      AdminUser?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledAt])
+  @@map("notification_campaigns")
+}
+
+model Recipe {
+  id                 String       @id @default(uuid()) @db.Uuid
+  foodItemId         String?      @map("food_item_id") @db.Uuid
+  title              String       @db.VarChar(200)
+  description        String?      @db.Text
+  cuisine            String       @default("INDIAN_NORTH") @db.VarChar(50)
+  dietaryTags        String[]     @default([]) @map("dietary_tags")
+
+  servings           Int          @default(2)
+  prepTimeMinutes    Int          @default(15) @map("prep_time_minutes")
+  cookTimeMinutes    Int          @default(20) @map("cook_time_minutes")
+  difficulty         String       @default("EASY") @db.VarChar(20)
+  instructions       Json         @db.JsonB
+  ingredients        Json         @db.JsonB
+  caloriesPerServing Decimal?     @map("calories_per_serving") @db.Decimal(8, 2)
+  proteinPerServing  Decimal?     @map("protein_per_serving") @db.Decimal(8, 2)
+  carbsPerServing    Decimal?     @map("carbs_per_serving") @db.Decimal(8, 2)
+  fatPerServing      Decimal?     @map("fat_per_serving") @db.Decimal(8, 2)
+  fiberPerServing    Decimal?     @map("fiber_per_serving") @db.Decimal(8, 2)
+  isPublished        Boolean      @default(true) @map("is_published")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  foodItem           FoodItem?    @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+
+  @@index([cuisine, isPublished])
+  @@index([title])
+  @@map("recipes")
+}
+
 
 

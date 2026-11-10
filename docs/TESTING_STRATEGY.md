@@ -387,3 +387,31 @@ Part 12 implements end-to-end testing across shared entitlement formulas, contra
   - `NotificationPreferencesView`: Renders reminder switches, quiet hours inputs, and verifies preference save interactions.
 - **`analytics.test.tsx`:**
   - `AnalyticsService`: Enqueues events with PII sanitization, flushes batches to backend, and handles offline network interruptions without crashing UI.
+
+---
+
+## 15. Web Admin Panel & Operations Dashboard Testing Strategy (Part 14)
+
+### 15.1. Scope & Verification Layers
+
+Testing for the administrative platform covers both backend security/integrity and frontend operational workflows:
+
+1. **RBAC & Authentication Integrity Tests (`apps/api/tests/adminOperations.test.ts`):**
+   - Unauthenticated requests rejected with `401 Unauthorized`.
+   - Regular application users rejected from administrative routes with `403 Forbidden`.
+   - Inactive/suspended administrator accounts rejected with `403 Forbidden`.
+   - Role privilege boundaries verified (e.g. `SUPPORT_ADMIN` denied from `/admins`).
+   - Self-suspension and last-super-admin demotion prevention verified.
+2. **Operations & Audit Ledger Verification (`apps/api/tests/adminOperations.test.ts`):**
+   - User suspension and reactivation state updates and audit event recording.
+   - Food database item creation, modification, deletion, and verified status updates with audit records.
+   - Scan operation failure inspection and status reset for job retries.
+   - Support ticket creation, status/priority updates, and internal staff note appending.
+   - Notification campaign creation and simulated FCM dispatch.
+   - System telemetry and infrastructure health metrics aggregation.
+3. **Frontend Component & Route Guard Tests (`apps/admin/src/test/AdminApp.test.tsx`):**
+   - `LoginView` rendering with token input and developer test persona buttons.
+   - `ProtectedRoute` redirection to `/login` for unauthenticated visitors.
+   - `ProtectedRoute` clearance restriction banner for insufficient operator roles.
+   - `AdminAuthContext` token persistence in `localStorage` and cleanup on logout.
+   - Authorized navigation and layout rendering.

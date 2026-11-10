@@ -536,3 +536,91 @@ sequenceDiagram
     App->>App: parseDeepLink() extracts route 'Diary' and params { meal: 'lunch' }
     App->>User: Navigates directly to Food Diary focused on Lunch section
 ```
+
+---
+
+## 14. Web Admin Panel & Operations Workflows (Part 14)
+
+### 14.1. Admin Authentication, RBAC Clearance & Navigation
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Administrative Operator
+    participant Web as Admin Web Panel (SPA)
+    participant AuthContext as AdminAuthContext
+    participant API as /api/v1/admin
+    participant DB as PostgreSQL Database
+
+    Admin->>Web: Opens Admin Console URL (`/login`)
+    Admin->>Web: Submits Firebase Administrator Bearer Token
+    Web->>API: GET /api/v1/admin/me (with Authorization Header)
+    API->>API: Verify Firebase Token & lookup admin_users by firebaseUid
+    alt User is not in admin_users or isActive = false
+        API-->>Web: 403 Forbidden ("Not an authorized CAL METER administrator")
+        Web-->>Admin: Displays security rejection banner
+    else Valid administrator
+        API-->>Web: 200 OK (Admin profile: role, permissions)
+        Web->>AuthContext: Store token in secure storage & set active role
+        Web-->>Admin: Renders Operations Dashboard with role-specific navigation menu
+    end
+```
+
+### 14.2. User Suspension & Audit Trail Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Operations Admin
+    participant Web as Admin Web Panel
+    participant API as /api/v1/admin
+    participant DB as PostgreSQL Database
+    actor TargetUser as Suspended User
+    participant Mobile as Mobile App Client
+
+    Admin->>Web: Searches user in User Directory (`/users`)
+    Web->>API: GET /api/v1/admin/users?search=user@domain.com
+    API-->>Web: Returns user profile & activity summary
+    Admin->>Web: Clicks "Suspend", provides mandatory audit reason
+    Web->>API: POST /api/v1/admin/users/:id/suspend { reason: "Suspicious API automation" }
+    API->>API: Verify caller role (>= OPERATIONS_ADMIN)
+    API->>DB: UPDATE users SET is_suspended = true, suspended_at = NOW(), suspension_reason = '...'
+    API->>DB: INSERT INTO admin_audit_logs (admin_id, action: 'USER_SUSPEND', target_resource: 'user', reason, ip_address)
+    API-->>Web: 200 OK (Updated user state)
+    Web-->>Admin: Displays active suspended badge and confirms audit entry
+
+    TargetUser->>Mobile: Opens CAL METER mobile application
+    Mobile->>API: GET /api/v1/diary or POST /api/v1/scans
+    API->>DB: User lookup detects is_suspended = true
+    API-->>Mobile: 403 Forbidden ("Account is suspended. Please contact customer support.")
+    Mobile-->>TargetUser: Displays account suspension alert with support resolution link
+```
+
+### 14.3. Scan Operations & Failure Troubleshooting Workflow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Support as Support Admin
+    actor Ops as Operations Admin
+    participant Web as Admin Web Panel
+    participant API as /api/v1/admin
+    participant DB as PostgreSQL Database
+    participant Queue as BullMQ Scan Queue
+
+    Support->>Web: Navigates to Scan Operations (`/scans?status=FAILED`)
+    Web->>API: GET /api/v1/admin/scans?status=FAILED
+    API-->>Web: List of failed recognitions with latencies & failure reasons
+    Support->>Web: Clicks "Inspect Payload" on failed scan ID
+    Web->>API: GET /api/v1/admin/scans/:id
+    API-->>Web: Complete scan log with raw AI response, tokens, and error message
+    Web-->>Support: Displays formatted inspection drawer
+
+    Ops->>Web: Clicks "Retry Scan"
+    Web->>API: POST /api/v1/admin/scans/:id/retry
+    API->>DB: UPDATE food_scan_logs SET status = 'PENDING', error_message = NULL
+    API->>DB: INSERT INTO admin_audit_logs (action: 'SCAN_RETRY', target_resource: 'food_scan_log')
+    API->>Queue: Enqueue scan processing job with scanId
+    API-->>Web: 200 OK (Status reset to PENDING)
+    Web-->>Ops: Displays job queued indicator
+```

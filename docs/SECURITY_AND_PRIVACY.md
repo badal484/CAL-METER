@@ -404,3 +404,18 @@ CAL METER adheres to strict privacy-by-design principles regarding mobile camera
   - `GET /ready`: Readiness probe verifying active PostgreSQL database connectivity and Redis ping.
 - **Telemetry Endpoints:**
   - `GET /metrics` and `GET /api/v1/metrics`: Surfaces in-memory operational performance metrics, heap utilization, request latency percentiles (average and P95), and status code distributions in Prometheus exposition format.
+
+---
+
+## 9. Web Admin Panel Security & Governance Architecture (Part 14)
+
+### 9.1. Threat Model & Mitigation Matrix
+
+| Threat Category                    | Risk Description                                                                                    | Architectural Mitigation                                                                                                                                                                      |
+| :--------------------------------- | :-------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unauthorized Administration**    | Malicious actor attempts administrative API calls.                                                  | Strict Firebase bearer token verification + mandatory lookup against `admin_users` table. Inactive/unregistered users are blocked with `403 Forbidden`.                                       |
+| **Privilege Escalation**           | Lower-tier operator attempts super-admin actions (e.g. provisioning admins or demoting colleagues). | Server-side RBAC guard `requireAdminRole(...)` validates role hierarchy on every route handler. Frontend UI guards provide UX convenience only.                                               |
+| **Repudiation / Covert Tampering** | Admin operator modifies user accounts or food records without accountability.                       | Append-only `admin_audit_logs` records actor UUID, action, target resource, diff, IP address, user agent, and timestamp. Audit logs cannot be updated or deleted via API.                     |
+| **Self-Lockout & Demotion**        | A sole super administrator demotes or disables their own account.                                   | Backend safeguard explicitly checks super admin count and blocks self-suspension or demotion of the last active `SUPER_ADMIN`.                                                                |
+| **Sensitive Data Exposure**        | Exposure of private AI chat text, user passwords, or tokens in admin views.                         | User passwords do not exist on the platform (Firebase Auth handles credentials). AI telemetry only surfaces token counters, cost approximations, and error codes—never raw conversation text. |
+| **Public Admin Registration**      | Attackers attempting to self-register administrative accounts.                                      | Public admin registration endpoints are explicitly excluded from the router. All admin accounts must be provisioned by an active `SUPER_ADMIN`.                                               |

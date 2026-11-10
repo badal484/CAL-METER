@@ -1239,3 +1239,113 @@ Anonymized, privacy-scrubbed product analytics event store.
 | `app_version`     | `VARCHAR(50)`    | NULLABLE                          | Client version string                  |
 | `session_id`      | `VARCHAR(100)`   | NULLABLE                          | Anonymous session token                |
 | `timestamp`       | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`         | Event occurrence time                  |
+
+---
+
+## 6. Web Admin Panel, Operations & Governance Models (Part 14)
+
+### 6.1. Schema Entities
+
+#### 1. AdminUser (`admin_users`)
+
+Stores authorized administrative staff accounts provisioned exclusively by `SUPER_ADMIN` operators.
+
+| Column          | Type             | Constraints                         | Description                                                            |
+| :-------------- | :--------------- | :---------------------------------- | :--------------------------------------------------------------------- |
+| `id`            | `UUID`           | PK, Default `gen_random_uuid()`     | Unique internal administrator identifier                               |
+| `firebase_uid`  | `VARCHAR(128)`   | UNIQUE, NOT NULL                    | Firebase Authentication identity UID                                   |
+| `email`         | `VARCHAR(255)`   | UNIQUE, NOT NULL                    | Corporate administrator email                                          |
+| `name`          | `VARCHAR(100)`   | NOT NULL                            | Full name of administrative operator                                   |
+| `role`          | `AdminRole`      | NOT NULL, DEFAULT `'SUPPORT_ADMIN'` | `SUPER_ADMIN`, `OPERATIONS_ADMIN`, `NUTRITION_EDITOR`, `SUPPORT_ADMIN` |
+| `is_active`     | `BOOLEAN`        | NOT NULL, DEFAULT `true`            | Active account status flag (false denies all administrative actions)   |
+| `last_login_at` | `TIMESTAMPTZ(6)` | NULLABLE                            | Timestamp of most recent admin console authentication                  |
+| `created_by`    | `UUID`           | NULLABLE                            | ID of the super administrator who provisioned the account              |
+| `created_at`    | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`           | Provisioning timestamp                                                 |
+| `updated_at`    | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`           | Last update timestamp                                                  |
+
+#### 2. AdminAuditLog (`admin_audit_logs`)
+
+Immutable, append-only operational audit trail recording every state-changing administrative action.
+
+| Column            | Type             | Constraints                            | Description                                                          |
+| :---------------- | :--------------- | :------------------------------------- | :------------------------------------------------------------------- |
+| `id`              | `UUID`           | PK, Default `gen_random_uuid()`        | Unique audit event identifier                                        |
+| `admin_id`        | `UUID`           | FK `admin_users.id`, ON DELETE CASCADE | Administrative operator responsible for the mutation                 |
+| `action`          | `VARCHAR(100)`   | NOT NULL                               | Standard audit action (e.g. `USER_SUSPEND`, `FOOD_CREATE`)           |
+| `target_resource` | `VARCHAR(100)`   | NOT NULL                               | Target entity category (`user`, `food_item`, `recipe`, `admin_user`) |
+| `target_id`       | `VARCHAR(100)`   | NULLABLE                               | Primary key or reference identifier of the affected record           |
+| `details`         | `JSONB`          | NULLABLE                               | Structured mutation diff (previous vs new state)                     |
+| `reason`          | `TEXT`           | NULLABLE                               | Mandatory operator justification text for destructive actions        |
+| `ip_address`      | `VARCHAR(45)`    | NULLABLE                               | IPv4/IPv6 address of the originating administrator request           |
+| `user_agent`      | `VARCHAR(255)`   | NULLABLE                               | Client browser/agent string                                          |
+| `request_id`      | `VARCHAR(100)`   | NULLABLE                               | Correlation ID linking back to application server logs               |
+| `status`          | `VARCHAR(20)`    | NOT NULL, DEFAULT `'SUCCESS'`          | Result status (`SUCCESS` or `FAILURE`)                               |
+| `created_at`      | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`              | Audit entry timestamp (immutable)                                    |
+
+#### 3. SupportTicket (`support_tickets`) & SupportTicketNote (`support_ticket_notes`)
+
+Internal customer support ticketing system with internal operator communication threads.
+
+| Column              | Type                    | Constraints                             | Description                                                                            |
+| :------------------ | :---------------------- | :-------------------------------------- | :------------------------------------------------------------------------------------- |
+| `id`                | `UUID`                  | PK, Default `gen_random_uuid()`         | Unique ticket identifier                                                               |
+| `user_id`           | `UUID`                  | FK `users.id`, ON DELETE SET NULL       | Associated end-user account (null for unauthenticated inquiries)                       |
+| `user_email`        | `VARCHAR(255)`          | NULLABLE                                | Contact email address                                                                  |
+| `category`          | `SupportTicketCategory` | NOT NULL                                | `ACCOUNT_BILLING`, `FOOD_DATABASE`, `AI_SCAN_FAILURE`, `BUG_REPORT`, `GENERAL_INQUIRY` |
+| `priority`          | `SupportTicketPriority` | NOT NULL, DEFAULT `'MEDIUM'`            | `LOW`, `MEDIUM`, `HIGH`, `URGENT`                                                      |
+| `status`            | `SupportTicketStatus`   | NOT NULL, DEFAULT `'OPEN'`              | `OPEN`, `IN_PROGRESS`, `WAITING_ON_USER`, `RESOLVED`, `CLOSED`                         |
+| `subject`           | `VARCHAR(200)`          | NOT NULL                                | Ingestion subject line                                                                 |
+| `message`           | `TEXT`                  | NOT NULL                                | Full text description of inquiry or issue                                              |
+| `assigned_admin_id` | `UUID`                  | FK `admin_users.id`, ON DELETE SET NULL | Operator assigned to manage the ticket                                                 |
+| `resolution_notes`  | `TEXT`                  | NULLABLE                                | Final operator summary upon ticket closure                                             |
+| `created_at`        | `TIMESTAMPTZ(6)`        | NOT NULL, DEFAULT `NOW()`               | Ticket filing timestamp                                                                |
+| `updated_at`        | `TIMESTAMPTZ(6)`        | NOT NULL, DEFAULT `NOW()`               | Last update timestamp                                                                  |
+
+#### 4. NotificationCampaign (`notification_campaigns`)
+
+Outbound broadcast campaigns targeted by subscriber tier or user activity.
+
+| Column            | Type                         | Constraints                             | Description                                                            |
+| :---------------- | :--------------------------- | :-------------------------------------- | :--------------------------------------------------------------------- |
+| `id`              | `UUID`                       | PK, Default `gen_random_uuid()`         | Unique campaign identifier                                             |
+| `title`           | `VARCHAR(200)`               | NOT NULL                                | Notification banner title                                              |
+| `body`            | `TEXT`                       | NOT NULL                                | Broadcast copy content                                                 |
+| `category`        | `NotificationCategory`       | NOT NULL                                | System reminder category                                               |
+| `deep_link`       | `VARCHAR(255)`               | NULLABLE                                | Client navigation route (e.g. `calmeter://paywall`)                    |
+| `target_audience` | `VARCHAR(50)`                | NOT NULL, DEFAULT `'ALL'`               | `ALL`, `FREE_TIER`, `PREMIUM_TIER`                                     |
+| `status`          | `NotificationCampaignStatus` | NOT NULL, DEFAULT `'DRAFT'`             | `DRAFT`, `SCHEDULED`, `PROCESSING`, `COMPLETED`, `CANCELLED`, `FAILED` |
+| `scheduled_at`    | `TIMESTAMPTZ(6)`             | NULLABLE                                | Future dispatch execution window                                       |
+| `sent_at`         | `TIMESTAMPTZ(6)`             | NULLABLE                                | Actual execution timestamp                                             |
+| `total_targeted`  | `INTEGER`                    | NOT NULL, DEFAULT `0`                   | Total matching active device tokens targeted                           |
+| `total_sent`      | `INTEGER`                    | NOT NULL, DEFAULT `0`                   | Dispatched notifications count                                         |
+| `total_failed`    | `INTEGER`                    | NOT NULL, DEFAULT `0`                   | Failed provider delivery count                                         |
+| `created_by_id`   | `UUID`                       | FK `admin_users.id`, ON DELETE SET NULL | Authoring operator UUID                                                |
+| `created_at`      | `TIMESTAMPTZ(6)`             | NOT NULL, DEFAULT `NOW()`               | Campaign creation timestamp                                            |
+| `updated_at`      | `TIMESTAMPTZ(6)`             | NOT NULL, DEFAULT `NOW()`               | Modification timestamp                                                 |
+
+#### 5. Recipe (`recipes`)
+
+Curated healthy recipes with ingredients, preparation steps, and verified nutritional values per serving.
+
+| Column                 | Type             | Constraints                            | Description                                                    |
+| :--------------------- | :--------------- | :------------------------------------- | :------------------------------------------------------------- |
+| `id`                   | `UUID`           | PK, Default `gen_random_uuid()`        | Unique recipe identifier                                       |
+| `food_item_id`         | `UUID`           | FK `food_items.id`, ON DELETE SET NULL | Optional canonical food database item mapping                  |
+| `title`                | `VARCHAR(200)`   | NOT NULL                               | Recipe display title                                           |
+| `description`          | `TEXT`           | NULLABLE                               | Culinary and preparation summary                               |
+| `cuisine`              | `VARCHAR(50)`    | NOT NULL, DEFAULT `'INDIAN_NORTH'`     | Regional cuisine classification                                |
+| `dietary_tags`         | `TEXT[]`         | NOT NULL, DEFAULT `{}`                 | Dietary attributes (e.g. `HIGH_PROTEIN`, `VEGETARIAN`)         |
+| `servings`             | `INTEGER`        | NOT NULL, DEFAULT `2`                  | Standard serving yield count                                   |
+| `prep_time_minutes`    | `INTEGER`        | NOT NULL, DEFAULT `15`                 | Preparation time estimate                                      |
+| `cook_time_minutes`    | `INTEGER`        | NOT NULL, DEFAULT `20`                 | Active cooking duration estimate                               |
+| `difficulty`           | `VARCHAR(20)`    | NOT NULL, DEFAULT `'EASY'`             | `EASY`, `MEDIUM`, `HARD`                                       |
+| `instructions`         | `JSONB`          | NOT NULL                               | Ordered array of preparation instructions                      |
+| `ingredients`          | `JSONB`          | NOT NULL                               | Array of structured ingredients (`name`, `amount`, `calories`) |
+| `calories_per_serving` | `DECIMAL(8,2)`   | NULLABLE                               | Energy per portion                                             |
+| `protein_per_serving`  | `DECIMAL(8,2)`   | NULLABLE                               | Protein grams per portion                                      |
+| `carbs_per_serving`    | `DECIMAL(8,2)`   | NULLABLE                               | Carbohydrate grams per portion                                 |
+| `fat_per_serving`      | `DECIMAL(8,2)`   | NULLABLE                               | Fat grams per portion                                          |
+| `fiber_per_serving`    | `DECIMAL(8,2)`   | NULLABLE                               | Fiber grams per portion                                        |
+| `is_published`         | `BOOLEAN`        | NOT NULL, DEFAULT `true`               | Visibility in the mobile discovery feed                        |
+| `created_at`           | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`              | Creation timestamp                                             |
+| `updated_at`           | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`              | Last modification timestamp                                    |
