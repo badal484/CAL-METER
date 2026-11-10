@@ -3,8 +3,40 @@
   "version": "1.0.0",
   "private": true,
   "description": "CAL METER React Native mobile client",
+  "main": "index.js",
   "scripts": {
-    "build": "echo 'Mobile build placeholder'",
-    "typecheck": "echo 'Mobile typecheck placeholder'"
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@calmeter/contracts": "*",
+    "@calmeter/shared": "*",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/native": "^7.0.14",
+    "lucide-react-native": "^0.475.0",
+    "react": "18.3.1",
+    "react-native": "0.77.3",
+    "react-native-safe-area-context": "^5.1.0",
+    "react-native-screens": "4.4.0",
+    "react-native-svg": "15.11.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "15.0.1",
+    "@react-native-community/cli-platform-android": "15.0.1",
+    "@react-native-community/cli-platform-ios": "15.0.1",
+    "@react-native/babel-preset": "0.77.3",
+    "@react-native/metro-config": "0.77.3",
+    "@react-native/typescript-config": "0.77.3",
+    "@types/react": "^18.2.6",
+    "@types/react-native": "^0.72.8",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
   }
 }

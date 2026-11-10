@@ -60,6 +60,57 @@ npm run format:check
 
 ---
 
+## Mobile Application (`apps/mobile`)
+
+The mobile client is a pure **React Native CLI** application built without Expo.
+
+### Tech Stack & Architecture
+
+- **Framework**: React Native 0.77.3 with React 18.3.1 (React Native CLI, New Architecture compatible)
+- **Language**: TypeScript with strict mode enabled
+- **Navigation**: React Navigation v7 (`@react-navigation/native` & `@react-navigation/bottom-tabs`)
+- **Icons**: `lucide-react-native` and `react-native-svg` (15.11.1)
+- **Safe Area**: `react-native-safe-area-context`
+- **Monorepo Integration**: Metro configured with `watchFolders` and `resolver.nodeModulesPaths` for seamless resolution of `@calmeter/shared` and `@calmeter/contracts`
+
+### Navigation Destinations
+
+The bottom tab navigator features 5 primary destinations:
+
+1. **Home**: Daily calorie balance hero card, remaining budget, macronutrient breakdown, quick food logging actions, and recent activity log.
+2. **Diary**: Interactive date navigator, daily summary card, meal sections (Breakfast, Lunch, Dinner, Snacks), individual food item cards with macro distributions, and empty state messaging.
+3. **Scan (Center Action)**: Visually elevated circular center tab action with quick-launch cards for AI food photo recognition, barcode scanner, and nutrition label OCR (with milestone preview notice).
+4. **Progress**: 7-day, 30-day, and 90-day weight tracking trend with preview bar chart and calorie adherence statistics.
+5. **Profile**: User biometrics card, dark mode toggle, metric/imperial unit preference switch, and nutrition targets management list.
+
+### Minimal Monochrome Design System
+
+CAL METER adheres to an intentional, high-contrast monochrome design philosophy:
+
+- **Palette**: Pure Black (`#000000`), Pure White (`#FFFFFF`), and refined Neutral Grays (`#F9FAFB` to `#111827`).
+- **Forbidden**: No bright greens, oranges, colorful gradients, fruit cartoons, or unnecessary emojis.
+- **Tokens**: Strictly structured tokens for colors, typography scale, spacing (`spacing.xs` to `spacing.massive`), border radii (`radii.sm` to `radii.full`), touch dimensions (minimum 44x44pt accessibility targets), and subtle platform elevations.
+- **Theme Modes**: First-class support for `light`, `dark`, and `system` themes via `ThemeProvider` and `useTheme()`.
+
+### Running the Mobile Client
+
+```bash
+# Navigate to mobile app directory
+cd apps/mobile
+
+# Start Metro bundler with cache reset
+npm run start -- --reset-cache
+
+# Run on Android (requires Android SDK & running emulator or connected device)
+npm run android
+
+# Run on iOS (macOS only, requires Xcode & CocoaPods)
+cd ios && pod install && cd ..
+npm run ios
+```
+
+---
+
 ## Technical Documentation Index
 
 All architectural, product, engineering, and security specifications are located in the [`docs/`](docs/) directory:
