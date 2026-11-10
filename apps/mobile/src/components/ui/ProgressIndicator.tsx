@@ -24,12 +24,18 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   const { theme } = useTheme();
   const { colors, typography, radii, spacing } = theme;
 
-  const safeCurrent =
-    typeof current === 'number' && Number.isFinite(current) ? Math.max(0, current) : 0;
-  const safeTarget =
-    typeof target === 'number' && Number.isFinite(target) ? Math.max(0, target) : 0;
-  const progressRatio = safeTarget > 0 ? Math.min(Math.max(safeCurrent / safeTarget, 0), 1) : 0;
-  const percentage = Number.isFinite(progressRatio) ? Math.round(progressRatio * 100) : 0;
+  const isTargetValid = typeof target === 'number' && Number.isFinite(target) && target > 0;
+  const sanitizedTarget = isTargetValid ? Math.max(0, target) : 0;
+
+  const isCurrentValid = typeof current === 'number' && Number.isFinite(current);
+  const rawCurrent = isCurrentValid ? Math.max(0, current) : 0;
+
+  // If the target is non-finite, zero, or negative, effective progress is zero.
+  // Otherwise, apply overflow clamping so now <= max is strictly guaranteed.
+  const sanitizedCurrent = isTargetValid ? Math.min(rawCurrent, sanitizedTarget) : 0;
+
+  const progressRatio = sanitizedTarget > 0 ? sanitizedCurrent / sanitizedTarget : 0;
+  const percentage = Math.round(progressRatio * 100);
   const clampedPercentage = Math.min(100, Math.max(0, percentage));
 
   return (
@@ -39,8 +45,8 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       accessibilityRole="progressbar"
       accessibilityValue={{
         min: 0,
-        max: safeTarget,
-        now: safeCurrent,
+        max: sanitizedTarget,
+        now: sanitizedCurrent,
         text: `${clampedPercentage}% completed`,
       }}
       accessibilityLabel={label || 'Progress'}
@@ -54,8 +60,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           )}
           {showValues ? (
             <Text style={[typography.bodySmall, { color: colors.textPrimary }]}>
-              <Text style={{ fontWeight: '600' }}>{Math.round(safeCurrent)}</Text>
-              {safeTarget > 0 ? ` / ${Math.round(safeTarget)}${unit ? ' ' + unit : ''}` : ''}
+              <Text style={{ fontWeight: '600' }}>{Math.round(sanitizedCurrent)}</Text>
+              {sanitizedTarget > 0
+                ? ` / ${Math.round(sanitizedTarget)}${unit ? ' ' + unit : ''}`
+                : ''}
             </Text>
           ) : null}
         </View>

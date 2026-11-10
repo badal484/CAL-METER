@@ -139,6 +139,116 @@ describe('UI Component: ProgressIndicator & Numeric Edge Cases', () => {
     expect(containerInf.props.accessibilityValue.max).toBe(0);
     expect(containerInf.props.accessibilityValue.text).toBe('0% completed');
   });
+
+  describe('Part 3.2 Required ProgressIndicator Accessibility Range Regressions', () => {
+    it('case 1: current=500, target=0 satisfies min=0, max=0, now=0, now<=max', () => {
+      const props = Object.freeze({ current: 500, target: 0, label: 'Zero Target' });
+      const tree = renderWithTheme(<ProgressIndicator {...props} />);
+      const container = tree.root.findByProps({ accessibilityRole: 'progressbar' });
+      const val = container.props.accessibilityValue;
+
+      expect(val).toEqual({
+        min: 0,
+        max: 0,
+        now: 0,
+        text: '0% completed',
+      });
+      expect(val.min).toBe(0);
+      expect(val.max).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeLessThanOrEqual(val.max);
+    });
+
+    it('case 2: current=500, target=-100 satisfies min=0, max=0, now=0, now<=max', () => {
+      const props = Object.freeze({ current: 500, target: -100, label: 'Negative Target' });
+      const tree = renderWithTheme(<ProgressIndicator {...props} />);
+      const container = tree.root.findByProps({ accessibilityRole: 'progressbar' });
+      const val = container.props.accessibilityValue;
+
+      expect(val).toEqual({
+        min: 0,
+        max: 0,
+        now: 0,
+        text: '0% completed',
+      });
+      expect(val.min).toBe(0);
+      expect(val.max).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeLessThanOrEqual(val.max);
+    });
+
+    it('case 3: current=500, target=NaN satisfies min=0, max=0, now=0, now<=max', () => {
+      const props = Object.freeze({ current: 500, target: NaN, label: 'NaN Target' });
+      const tree = renderWithTheme(<ProgressIndicator {...props} />);
+      const container = tree.root.findByProps({ accessibilityRole: 'progressbar' });
+      const val = container.props.accessibilityValue;
+
+      expect(val).toEqual({
+        min: 0,
+        max: 0,
+        now: 0,
+        text: '0% completed',
+      });
+      expect(val.min).toBe(0);
+      expect(val.max).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeLessThanOrEqual(val.max);
+    });
+
+    it('case 4: current=Infinity, target=2000 satisfies min=0, max=2000, now=0, now<=max', () => {
+      const props = Object.freeze({ current: Infinity, target: 2000, label: 'Infinity Current' });
+      const tree = renderWithTheme(<ProgressIndicator {...props} />);
+      const container = tree.root.findByProps({ accessibilityRole: 'progressbar' });
+      const val = container.props.accessibilityValue;
+
+      expect(val).toEqual({
+        min: 0,
+        max: 2000,
+        now: 0,
+        text: '0% completed',
+      });
+      expect(val.min).toBe(0);
+      expect(val.max).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeLessThanOrEqual(val.max);
+    });
+
+    it('case 5: current=2000, target=2000 satisfies min=0, max=2000, now=2000, now<=max', () => {
+      const props = Object.freeze({ current: 2000, target: 2000, label: 'Full Progress' });
+      const tree = renderWithTheme(<ProgressIndicator {...props} />);
+      const container = tree.root.findByProps({ accessibilityRole: 'progressbar' });
+      const val = container.props.accessibilityValue;
+
+      expect(val).toEqual({
+        min: 0,
+        max: 2000,
+        now: 2000,
+        text: '100% completed',
+      });
+      expect(val.min).toBe(0);
+      expect(val.max).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeLessThanOrEqual(val.max);
+    });
+
+    it('case 6: current=2500, target=2000 satisfies min=0, max=2000, now=2000, now<=max with overflow clamping', () => {
+      const props = Object.freeze({ current: 2500, target: 2000, label: 'Overflow Progress' });
+      const tree = renderWithTheme(<ProgressIndicator {...props} />);
+      const container = tree.root.findByProps({ accessibilityRole: 'progressbar' });
+      const val = container.props.accessibilityValue;
+
+      expect(val).toEqual({
+        min: 0,
+        max: 2000,
+        now: 2000,
+        text: '100% completed',
+      });
+      expect(val.min).toBe(0);
+      expect(val.max).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeGreaterThanOrEqual(0);
+      expect(val.now).toBeLessThanOrEqual(val.max);
+    });
+  });
 });
 
 describe('UI Component: MacroIndicator', () => {
