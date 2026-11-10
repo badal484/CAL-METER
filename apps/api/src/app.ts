@@ -1,4 +1,5 @@
 import express, { type Express } from 'express';
+import type { PrismaClient } from '@prisma/client';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { requestLoggerMiddleware } from './middleware/logger.js';
 import { createSecurityMiddleware } from './middleware/security.js';
@@ -10,6 +11,7 @@ import { getConfig, type ParsedTrustProxy } from './config/env.js';
 export interface CreateAppOptions {
   verifier?: IFirebaseTokenVerifier;
   customVerifier?: IFirebaseTokenVerifier;
+  prisma?: PrismaClient;
   trustProxy?: ParsedTrustProxy;
   configureRoutes?: (app: Express) => void;
 }
@@ -38,7 +40,7 @@ export function createApp(options?: CreateAppOptions): Express {
 
   // Application Routes with injected dependencies
   const verifier = options?.verifier ?? options?.customVerifier;
-  const router = createRootRouter({ verifier });
+  const router = createRootRouter({ verifier, prisma: options?.prisma });
   app.use('/', router);
 
   // Optional custom test routes hook before error handlers

@@ -65,6 +65,11 @@ describe('Nutrition Math Engine', () => {
   - Prisma database queries: Cascading deletes, tenant isolation constraints, PostgreSQL CHECK constraint verification.
   - Redis cache: Key expiration, invalidation on meal updates, rate limiter sliding windows.
   - BullMQ Worker: Job dispatch, retry on simulated Gemini API timeout, database persistence.
+  - **Food Database & Search Subsystems (`apps/api/tests/`):**
+    - `foodImport.test.ts`: Ingestion normalization, source licensing validation, USDA and Open Food Facts mapping, ICMR-NIN commercial compliance gate, duplicate resolution, batch progress tracking, dry-run simulation.
+    - `foodSearch.test.ts`: Text search query parsing, Indian regional alias ranking priority (_phulka_ -> _roti_), barcode lookups, cuisine filtering, pagination, sort orders.
+    - `foodCustom.test.ts`: Custom food creation, multi-tenant isolation (User A vs. User B), anti-enumeration 404 security checks, update constraints, soft deletion preservation.
+    - `foodDatabase.test.ts`: PostgreSQL real CHECK constraints enforcement (`calories >= 0`, `confidence_score` [0, 1]), null vs. 0 nutrient preservation, shared nutrient aggregation formula verification, idempotency.
 
 ### 2.3. End-to-End (E2E) Testing (Maestro & Detox)
 

@@ -25,6 +25,13 @@ erDiagram
     MealEntry ||--o{ MealFoodItem : "contains"
     FoodItem ||--o{ MealFoodItem : "referenced by"
     FoodItem ||--o{ ServingUnitConversion : "supports"
+    FoodItem ||--o| FoodNutrientProfile : "detailed profile"
+    FoodItem ||--o{ FoodAlias : "known as"
+    FoodItem ||--o{ FoodIngredient : "recipe composed of"
+    FoodCategory ||--o{ FoodItem : "categorizes"
+    FoodDataSource ||--o{ FoodItem : "sources"
+    FoodDataSource ||--o{ FoodImportBatch : "tracks"
+    FoodImportBatch ||--o{ FoodItem : "imports"
 
     User {
         uuid id PK
@@ -65,6 +72,34 @@ erDiagram
         date effectiveDate
     }
 
+    FoodCategory {
+        uuid id PK
+        string name UK
+        string slug UK
+        string description
+    }
+
+    FoodDataSource {
+        uuid id PK
+        enum source UK
+        string name
+        string license
+        string licenseUrl
+        string attribution
+    }
+
+    FoodImportBatch {
+        uuid id PK
+        enum source FK
+        string batchNumber UK
+        enum status
+        int totalRecords
+        int importedRecords
+        int failedRecords
+        int skippedRecords
+        jsonb errorLog
+    }
+
     FoodItem {
         uuid id PK
         string name
@@ -72,6 +107,14 @@ erDiagram
         string brand
         string barcode UK
         enum source
+        string externalId
+        string cuisine
+        string state
+        string prepMethod
+        boolean isCustom
+        boolean isVerified
+        boolean isArchived
+        decimal confidenceScore
         decimal servingSize
         string servingUnit
         decimal standardWeightGrams
@@ -81,17 +124,61 @@ erDiagram
         decimal fat
         decimal fiber
         jsonb micronutrients
-        boolean isVerified
+        uuid categoryId FK
+        uuid dataSourceId FK
+        uuid importBatchId FK
         uuid createdByUserId FK
+    }
+
+    FoodNutrientProfile {
+        uuid id PK
+        uuid foodItemId FK,UK
+        decimal calories
+        decimal protein
+        decimal carbs
+        decimal fat
+        decimal saturatedFat
+        decimal transFat
+        decimal fiber
+        decimal sugar
+        decimal addedSugar
+        decimal sodium
+        decimal cholesterol
+        decimal potassium
+        decimal calcium
+        decimal iron
+        decimal vitaminD
+        decimal vitaminB12
+        jsonb micronutrients
     }
 
     ServingUnitConversion {
         uuid id PK
         uuid foodItemId FK
         string unitName
+        string servingDescription
         decimal gramWeight
         decimal mlVolume
+        string provenance
         boolean isDefault
+    }
+
+    FoodAlias {
+        uuid id PK
+        uuid foodItemId FK
+        string alias
+        string language
+        boolean isPrimary
+    }
+
+    FoodIngredient {
+        uuid id PK
+        uuid parentFoodItemId FK
+        uuid ingredientFoodItemId FK
+        string ingredientName
+        decimal gramWeight
+        string notes
+        int orderIndex
     }
 
     MealEntry {
@@ -248,6 +335,13 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 // -------------------------------------------------------------
 // MODELS
 // -------------------------------------------------------------
@@ -316,6 +410,57 @@ model NutritionGoal {
   @@map("nutrition_goals")
 }
 
+model FoodCategory {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @unique @db.VarChar(100)
+  slug        String     @unique @db.VarChar(100)
+  description String?    @db.VarChar(500)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  foods       FoodItem[]
+
+  @@map("food_categories")
+}
+
+model FoodDataSource {
+  id            String            @id @default(uuid()) @db.Uuid
+  source        FoodSource        @unique
+  name          String            @db.VarChar(100)
+  license       String            @db.VarChar(150)
+  licenseUrl    String?           @map("license_url") @db.VarChar(500)
+  attribution   String?           @db.VarChar(500)
+  description   String?           @db.VarChar(1000)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  foods         FoodItem[]
+  importBatches FoodImportBatch[]
+
+  @@map("food_data_sources")
+}
+
+model FoodImportBatch {
+  id              String          @id @default(uuid()) @db.Uuid
+  source          FoodSource
+  batchNumber     String          @unique @map("batch_number") @db.VarChar(100)
+  status          ImportStatus    @default(PENDING)
+  totalRecords    Int             @default(0) @map("total_records")
+  importedRecords Int             @default(0) @map("imported_records")
+  failedRecords   Int             @default(0) @map("failed_records")
+  skippedRecords  Int             @default(0) @map("skipped_records")
+  errorLog        Json            @default("[]") @map("error_log")
+  metadata        Json            @default("{}")
+  startedAt       DateTime        @default(now()) @map("started_at")
+  completedAt     DateTime?       @map("completed_at")
+
+  dataSource      FoodDataSource? @relation(fields: [source], references: [source], onDelete: Cascade)
+  foods           FoodItem[]
+
+  @@index([source, status])
+  @@map("food_import_batches")
+}
+
 model FoodItem {
   id                  String                  @id @default(uuid()) @db.Uuid
   name                String                  @db.VarChar(255)
@@ -323,6 +468,14 @@ model FoodItem {
   brand               String?                 @db.VarChar(255)
   barcode             String?                 @unique @db.VarChar(64)
   source              FoodSource              @default(CUSTOM_USER)
+  externalId          String?                 @map("external_id") @db.VarChar(100)
+  cuisine             String?                 @db.VarChar(50)
+  state               String?                 @db.VarChar(30)
+  prepMethod          String?                 @map("prep_method") @db.VarChar(50)
+  isCustom            Boolean                 @default(false) @map("is_custom")
+  isVerified          Boolean                 @default(false) @map("is_verified")
+  isArchived          Boolean                 @default(false) @map("is_archived")
+  confidenceScore     Decimal?                @map("confidence_score") @db.Decimal(3, 2)
   servingSize         Decimal                 @default(100.00) @map("serving_size") @db.Decimal(8, 2)
   servingUnit         String                  @default("g") @map("serving_unit") @db.VarChar(50)
   standardWeightGrams Decimal                 @default(100.00) @map("standard_weight_grams") @db.Decimal(8, 2)
@@ -332,34 +485,112 @@ model FoodItem {
   fat                 Decimal                 @db.Decimal(8, 2)
   fiber               Decimal                 @default(0.00) @db.Decimal(8, 2)
   micronutrients      Json                    @default("{}")
-  isVerified          Boolean                 @default(false) @map("is_verified")
+  categoryId          String?                 @map("category_id") @db.Uuid
+  dataSourceId        String?                 @map("data_source_id") @db.Uuid
+  importBatchId       String?                 @map("import_batch_id") @db.Uuid
   createdByUserId     String?                 @map("created_by_user_id") @db.Uuid
   createdAt           DateTime                @default(now()) @map("created_at")
   updatedAt           DateTime                @updatedAt @map("updated_at")
 
   createdByUser       User?                   @relation("UserCustomFoods", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  category            FoodCategory?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  dataSource          FoodDataSource?         @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  importBatch         FoodImportBatch?        @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+
+  nutrientProfile     FoodNutrientProfile?
   servingConversions  ServingUnitConversion[]
+  aliases             FoodAlias[]
   mealFoodItems       MealFoodItem[]
+  recipeIngredients   FoodIngredient[]        @relation("ParentRecipe")
+  usedAsIngredientIn  FoodIngredient[]        @relation("IngredientItem")
 
   @@index([name])
   @@index([barcode])
   @@index([source, isVerified])
+  @@index([cuisine])
+  @@index([categoryId])
+  @@index([createdByUserId])
+  @@index([externalId])
+  @@index([isCustom, isArchived])
   @@map("food_items")
 }
 
-model ServingUnitConversion {
-  id          String   @id @default(uuid()) @db.Uuid
-  foodItemId  String   @map("food_item_id") @db.Uuid
-  unitName    String   @map("unit_name") @db.VarChar(50) // e.g. "katori", "roti", "cup", "tbsp"
-  gramWeight  Decimal  @map("gram_weight") @db.Decimal(8, 2)
-  mlVolume    Decimal? @map("ml_volume") @db.Decimal(8, 2)
-  isDefault   Boolean  @default(false) @map("is_default")
-  createdAt   DateTime @default(now()) @map("created_at")
+model FoodNutrientProfile {
+  id             String    @id @default(uuid()) @db.Uuid
+  foodItemId     String    @unique @map("food_item_id") @db.Uuid
+  calories       Decimal   @db.Decimal(8, 2)
+  protein        Decimal   @db.Decimal(8, 2)
+  carbs          Decimal   @db.Decimal(8, 2)
+  fat            Decimal   @db.Decimal(8, 2)
+  saturatedFat   Decimal?  @map("saturated_fat") @db.Decimal(8, 2)
+  transFat       Decimal?  @map("trans_fat") @db.Decimal(8, 2)
+  fiber          Decimal?  @db.Decimal(8, 2)
+  sugar          Decimal?  @db.Decimal(8, 2)
+  addedSugar     Decimal?  @map("added_sugar") @db.Decimal(8, 2)
+  sodium         Decimal?  @db.Decimal(8, 2)
+  cholesterol    Decimal?  @db.Decimal(8, 2)
+  potassium      Decimal?  @db.Decimal(8, 2)
+  calcium        Decimal?  @db.Decimal(8, 2)
+  iron           Decimal?  @db.Decimal(8, 2)
+  vitaminD       Decimal?  @map("vitamin_d") @db.Decimal(8, 2)
+  vitaminB12     Decimal?  @map("vitamin_b12") @db.Decimal(8, 2)
+  micronutrients Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  foodItem    FoodItem @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+  foodItem       FoodItem  @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+
+  @@map("food_nutrient_profiles")
+}
+
+model ServingUnitConversion {
+  id                 String   @id @default(uuid()) @db.Uuid
+  foodItemId         String   @map("food_item_id") @db.Uuid
+  unitName           String   @map("unit_name") @db.VarChar(50)
+  servingDescription String?  @map("serving_description") @db.VarChar(100)
+  gramWeight         Decimal  @map("gram_weight") @db.Decimal(8, 2)
+  mlVolume           Decimal? @map("ml_volume") @db.Decimal(8, 2)
+  provenance         String   @default("USER_CONFIGURED") @db.VarChar(50)
+  isDefault          Boolean  @default(false) @map("is_default")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  foodItem           FoodItem @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
 
   @@unique([foodItemId, unitName])
+  @@index([foodItemId])
   @@map("serving_unit_conversions")
+}
+
+model FoodAlias {
+  id         String   @id @default(uuid()) @db.Uuid
+  foodItemId String   @map("food_item_id") @db.Uuid
+  alias      String   @db.VarChar(255)
+  language   String?  @db.VarChar(20)
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+
+  @@unique([foodItemId, alias])
+  @@index([alias])
+  @@map("food_aliases")
+}
+
+model FoodIngredient {
+  id                   String    @id @default(uuid()) @db.Uuid
+  parentFoodItemId     String    @map("parent_food_item_id") @db.Uuid
+  ingredientFoodItemId String?   @map("ingredient_food_item_id") @db.Uuid
+  ingredientName       String    @map("ingredient_name") @db.VarChar(255)
+  gramWeight           Decimal?  @map("gram_weight") @db.Decimal(8, 2)
+  notes                String?   @db.VarChar(255)
+  orderIndex           Int       @default(0) @map("order_index")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  parentFoodItem       FoodItem  @relation("ParentRecipe", fields: [parentFoodItemId], references: [id], onDelete: Cascade)
+  ingredientFoodItem   FoodItem? @relation("IngredientItem", fields: [ingredientFoodItemId], references: [id], onDelete: SetNull)
+
+  @@index([parentFoodItemId])
+  @@map("food_ingredients")
 }
 
 model MealEntry {
@@ -488,12 +719,41 @@ model DeletionRequest {
 ### 3.1. Compound Uniqueness & Tenant Protection
 
 - **`MealEntry(userId, date, mealType)`:** Enforces that a user has at most one record per meal slot per day. New items are appended to `MealFoodItem` linked to this canonical slot entry.
-- **`ServingUnitConversion(foodItemId, unitName)`:** Disallows duplicate unit definitions for the same food item.
+- **`ServingUnitConversion(foodItemId, unitName)`:** Disallows duplicate unit definitions for the same food item (`@@unique([foodItemId, unitName])`).
+- **`FoodAlias(foodItemId, alias)`:** Disallows duplicate alias text on the same food item (`@@unique([foodItemId, alias])`).
+- **`FoodImportBatch(batchNumber)`:** Enforces global batch uniqueness for idempotent ingestion (`@unique`).
+- **`FoodDataSource(source)`:** Enforces 1-to-1 mapping for registered authoritative data sources (`@unique`).
 
-### 3.2. Indexing Strategy
+### 3.2. Native PostgreSQL CHECK Constraints
+
+CAL METER enforces domain safety directly in PostgreSQL via additive migrations to guarantee numeric validity regardless of the client or direct query execution:
+
+```sql
+-- Enforced via migration 20261110120000_food_database_foundation
+ALTER TABLE "food_items"
+  ADD CONSTRAINT "chk_food_items_calories_non_neg" CHECK ("calories" >= 0),
+  ADD CONSTRAINT "chk_food_items_protein_non_neg" CHECK ("protein" >= 0),
+  ADD CONSTRAINT "chk_food_items_carbs_non_neg" CHECK ("carbs" >= 0),
+  ADD CONSTRAINT "chk_food_items_fat_non_neg" CHECK ("fat" >= 0),
+  ADD CONSTRAINT "chk_food_items_confidence_score_range" CHECK (
+    "confidence_score" IS NULL OR ("confidence_score" >= 0.00 AND "confidence_score" <= 1.00)
+  );
+
+ALTER TABLE "food_nutrient_profiles"
+  ADD CONSTRAINT "chk_food_nutrient_profiles_calories_non_neg" CHECK ("calories" >= 0),
+  ADD CONSTRAINT "chk_food_nutrient_profiles_protein_non_neg" CHECK ("protein" >= 0),
+  ADD CONSTRAINT "chk_food_nutrient_profiles_carbs_non_neg" CHECK ("carbs" >= 0),
+  ADD CONSTRAINT "chk_food_nutrient_profiles_fat_non_neg" CHECK ("fat" >= 0);
+```
+
+### 3.3. Indexing Strategy
 
 - **`B-Tree on (userId, date)`:** Eliminates table scans when querying the daily nutrition dashboard or historical weekly views.
-- **`Hash / B-Tree on FoodItem(barcode)`:** Guarantees instantaneous $O(1)$ lookups during barcode scanning.
+- **`B-Tree on FoodItem(barcode)`:** Guarantees instantaneous $O(1)$ lookups during barcode scanning.
+- **`B-Tree on FoodItem(cuisine)` & `FoodItem(categoryId)`:** Rapid category and regional cuisine filtering.
+- **`B-Tree on FoodItem(createdByUserId)`:** Scoped tenant isolation queries for custom foods.
+- **`B-Tree on FoodItem(isCustom, isArchived)`:** Eliminates soft-deleted and archived records from the active search index.
+- **`B-Tree on FoodAlias(alias)`:** Accelerates regional synonym lookups (_phulka_, _chapati_, _roti_).
 - **`GIN Index on FoodItem(name, localNames)`:** Built using PostgreSQL `pg_trgm` (trigram) extension for fuzzy substring matching across regional Indian and English dishes.
 
 ```sql

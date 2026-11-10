@@ -289,17 +289,244 @@ Polls analysis status or fetches final detected food items with matched nutritio
 
 ### Module 4: Food Catalog & Search (`/foods`)
 
-#### `GET /foods/search?q={query}&page=1&limit=20`
+#### `GET /foods`
 
-Searches verified foods, regional recipes, and user custom foods using fuzzy trigram indexing.
+Searches verified reference foods, regional recipes, and user custom foods using fuzzy trigram matching, brand filtering, barcode lookup, cuisine filters, and alias matching.
 
-#### `GET /foods/barcode/:barcode`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  - `q` (string, optional): Text query matching item name, brand, or regional aliases (_e.g. "roti", "phulka", "amul butter"_).
+  - `barcode` (string, optional): Exact barcode (EAN-13, EAN-8, UPC-A).
+  - `category` (string, optional): Category slug or ID.
+  - `cuisine` (string, optional): Regional cuisine (_e.g. "North Indian", "South Indian", "Italian"_).
+  - `isVerified` (boolean, optional): Filter by official verification status.
+  - `isCustom` (boolean, optional): When `true`, filters to authenticated user's own custom foods.
+  - `page` (number, default: 1): 1-indexed pagination.
+  - `limit` (number, default: 20, max: 100): Results per page.
+  - `sortBy` (string, default: "relevance"): `"relevance" | "name" | "calories" | "createdAt"`.
+  - `sortOrder` (string, default: "desc"): `"asc" | "desc"`.
+- **Multi-Tenant Scoping:** Authenticated users see public/verified foods, plus their own private custom foods. They never see other users' custom foods.
+- **Response `200 OK`:**
 
-Fetches verified packaged product by barcode (EAN/UPC). Queries Redis -> PostgreSQL -> Open Food Facts.
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "7f8b9c0d-1234-4567-89ab-cdef01234567",
+        "name": "Whole Wheat Roti / Phulka",
+        "localNames": ["Phulka", "Chapati", "Roti"],
+        "brand": null,
+        "barcode": null,
+        "source": "REFERENCE_INDIAN",
+        "cuisine": "North Indian",
+        "isCustom": false,
+        "isVerified": true,
+        "confidenceScore": 0.98,
+        "standardWeightGrams": 100.0,
+        "servingSize": 35.0,
+        "servingUnit": "piece",
+        "calories": 264.0,
+        "protein": 9.2,
+        "carbs": 55.4,
+        "fat": 1.2,
+        "fiber": 8.6,
+        "servings": [
+          {
+            "id": "srv-1",
+            "unitName": "piece",
+            "servingDescription": "1 medium phulka (approx. 6 inch)",
+            "gramWeight": 35.0,
+            "provenance": "REFERENCE_CURATED",
+            "isDefault": true
+          },
+          {
+            "id": "srv-2",
+            "unitName": "roti",
+            "servingDescription": "1 medium roti",
+            "gramWeight": 35.0,
+            "provenance": "REFERENCE_CURATED",
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
 
-#### `POST /foods/custom`
+#### `GET /foods/:id`
 
-Creates a private custom food item for the authenticated user.
+Retrieves complete nutritional and recipe details for a specific food item, including its full micronutrient profile, serving conversions, recipe ingredients, and aliases.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID)
+- **Tenant Protection:** If the requested food is custom and created by another user, returns `404 Not Found` (anti-enumeration protection).
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "7f8b9c0d-1234-4567-89ab-cdef01234567",
+    "name": "Dal Tadka (Home-style)",
+    "localNames": ["Yellow Dal", "Toor Dal Tadka"],
+    "brand": null,
+    "barcode": null,
+    "source": "REFERENCE_INDIAN",
+    "cuisine": "North Indian",
+    "state": "Pan-Indian",
+    "prepMethod": "Tempered with cumin, garlic, and ghee",
+    "isCustom": false,
+    "isVerified": true,
+    "standardWeightGrams": 100.0,
+    "servingSize": 200.0,
+    "servingUnit": "katori",
+    "calories": 92.0,
+    "protein": 4.6,
+    "carbs": 12.2,
+    "fat": 2.8,
+    "fiber": 3.1,
+    "nutrientProfile": {
+      "calories": 92.0,
+      "protein": 4.6,
+      "carbs": 12.2,
+      "fat": 2.8,
+      "saturatedFat": 1.1,
+      "transFat": 0.0,
+      "fiber": 3.1,
+      "sugar": 0.8,
+      "addedSugar": 0.0,
+      "sodium": 280.0,
+      "cholesterol": 3.0,
+      "potassium": 190.0,
+      "calcium": 24.0,
+      "iron": 1.3,
+      "vitaminD": null,
+      "vitaminB12": null,
+      "micronutrients": {
+        "magnesium_mg": 28.0,
+        "zinc_mg": 0.9
+      }
+    },
+    "servings": [
+      {
+        "id": "srv-dal-1",
+        "unitName": "katori",
+        "servingDescription": "1 standard bowl/katori (~200g)",
+        "gramWeight": 200.0,
+        "provenance": "REFERENCE_CURATED",
+        "isDefault": true
+      }
+    ],
+    "aliases": [
+      { "id": "al-1", "alias": "yellow dal", "language": "en", "isPrimary": true },
+      { "id": "al-2", "alias": "toor dal", "language": "hi", "isPrimary": false }
+    ]
+  }
+}
+```
+
+#### `GET /foods/:id/servings`
+
+Retrieves all configured serving unit conversions for a food item.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID)
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "srv-1",
+      "foodItemId": "7f8b9c0d-1234-4567-89ab-cdef01234567",
+      "unitName": "katori",
+      "servingDescription": "1 standard bowl/katori (~200g)",
+      "gramWeight": 200.0,
+      "mlVolume": 200.0,
+      "provenance": "REFERENCE_CURATED",
+      "isDefault": true
+    }
+  ]
+}
+```
+
+#### `POST /foods`
+
+Creates a private custom food item for the authenticated user with validated nutritional macros and custom serving units.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body (Zod Validated):**
+
+```json
+{
+  "name": "Mom's Special Paneer Bhurji",
+  "brand": "Homemade",
+  "cuisine": "North Indian",
+  "servingSize": 150.0,
+  "servingUnit": "katori",
+  "standardWeightGrams": 100.0,
+  "calories": 185.0,
+  "protein": 11.2,
+  "carbs": 4.5,
+  "fat": 13.8,
+  "fiber": 1.5,
+  "nutrientProfile": {
+    "saturatedFat": 6.8,
+    "sodium": 340.0,
+    "calcium": 180.0
+  },
+  "servings": [
+    {
+      "unitName": "katori",
+      "servingDescription": "1 medium bowl",
+      "gramWeight": 150.0,
+      "isDefault": true
+    }
+  ],
+  "aliases": ["Paneer Bhurji", "Scrambled Cottage Cheese"]
+}
+```
+
+- **Response `201 Created`:** Returns complete `FoodItemDetail` with `isCustom: true`, `isVerified: false`, and `createdByUserId` set to the caller.
+
+#### `PATCH /foods/:id`
+
+Updates fields on a user's own custom food item.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID)
+- **Tenant & Ownership Security:**
+  - Cannot modify verified global catalog foods (`403 Forbidden` / `404 Not Found`).
+  - Cannot modify custom foods belonging to other users (`404 Not Found` anti-enumeration).
+- **Request Body:** Partial `UpdateCustomFoodSchema` (e.g. update calories, protein, or brand).
+- **Response `200 OK`:** Returns updated `FoodItemDetail`.
+
+#### `DELETE /foods/:id`
+
+Soft-deletes a user's own custom food item by marking `isArchived = true`.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameter:** `id` (UUID)
+- **Data Integrity:** Historical diary entries (`meal_food_items`) referencing this food item are preserved intact.
+- **Tenant & Ownership Security:** Returns `404 Not Found` if the item is not a custom food owned by the caller.
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": { "message": "Custom food item archived successfully." }
+}
+```
 
 ---
 

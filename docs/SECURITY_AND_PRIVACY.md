@@ -107,6 +107,22 @@ graph TD
   });
   ```
 
+### 3.3. Food Catalog & Custom Food Ownership Governance
+
+1. **Dual Visibility Filtering:** Food search results (`GET /api/v1/foods`) automatically combine verified global foods with the authenticated user's private custom foods:
+   ```typescript
+   where: {
+     isArchived: false,
+     OR: [
+       { isCustom: false },
+       { isCustom: true, createdByUserId: internalUserId },
+     ],
+   }
+   ```
+2. **Anti-Enumeration Protection:** If a malicious or unauthorized user attempts to access (`GET /foods/:id`), modify (`PATCH /foods/:id`), or delete (`DELETE /foods/:id`) another user's private custom food, the service returns **`404 Not Found`** rather than `403 Forbidden`. This prevents attackers from probing and enumerating private food IDs or learning private dietary habits.
+3. **Protection of Verified Global Catalog:** Global catalog entries (`isVerified = true`, `isCustom = false`) cannot be updated or deleted through user-facing food APIs. Administrative review workflows are required for catalog changes.
+4. **Soft Deletion & Referential Integrity:** Custom food deletion sets `isArchived = true`. Hard deletion is prevented because historical diary entries (`meal_food_items`) depend on the immutable food ID and nutritional profile.
+
 ---
 
 ## 4. Storage Security & Image Privacy

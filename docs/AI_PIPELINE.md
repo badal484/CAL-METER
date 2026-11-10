@@ -128,26 +128,34 @@ Indian meals pose specific recognition edge cases. The vision pipeline applies h
 
 ## 5. Deterministic Matching Algorithm
 
-Once the vision worker receives `detectedItems`, it executes the matching pipeline:
+Once the vision worker receives `detectedItems`, it executes the matching pipeline against the Part 5 Food Database Foundation:
 
 ```mermaid
 flowchart TD
-    Item[Detected Item DTO] --> QueryDB[Fuzzy Trigram Search in PostgreSQL food_items]
+    Item[Detected Item DTO] --> QueryDB[Search PostgreSQL food_items + food_aliases]
     QueryDB --> MatchCheck{Exact or Trigram Match > 0.82?}
 
-    MatchCheck -- Yes --> UnitCheck{Does food-specific unit conversion exist?}
+    MatchCheck -- Yes --> UnitCheck{Does matching serving_unit_conversion exist?}
     UnitCheck -- Yes --> CalcStandard[Compute exact grams from food-specific conversion table]
     UnitCheck -- No --> CalcDensity[Use AI estimated gram weight with uncertainty marker]
-    CalcStandard --> FinalNutrients[Nutrients = gramWeight / 100 * baseNutrients]
-    CalcDensity --> FinalNutrients
-    FinalNutrients --> FlagVerified[Set source = REFERENCE_DATABASE]
+    CalcStandard --> FetchProfile[Join food_nutrient_profiles per 100g]
+    CalcDensity --> FetchProfile
+    FetchProfile --> FinalNutrients[Nutrients = gramWeight / 100 * baseNutrients via @calmeter/shared]
+    FinalNutrients --> FlagVerified[Preserve verified source: REFERENCE_INDIAN / USDA / OFF]
 
     MatchCheck -- No --> FallbackAI[Query external reference or use bounded baseline]
     FallbackAI --> FlagAI[Set source = AI_ESTIMATED]
 
-    FlagVerified --> Result[Return Matched Item to Client]
+    FlagVerified --> Result[Return Matched Item to Client with Confidence Tier]
     FlagAI --> Result
 ```
+
+### 5.1. Integration with Food Database Foundation
+
+1. **Multi-Field Matching:** Searches both canonical `name`, `local_names` string array, and dedicated `food_aliases` (e.g. mapping detected _"phulka"_ to _"Whole Wheat Roti / Phulka"_).
+2. **Serving Unit Resolution:** Uses `ServingUnitConversion` with food-specific density (e.g. _katori_ for Dal Tadka = 200g, whereas _katori_ for dry Bhindi Masala = 140g).
+3. **Nutrient Multiplication via Shared Formulas:** Employs `@calmeter/shared` `calculatePortionNutrients()` to perform deterministic scaling with rounding overflow guards and NaN/Infinity rejections.
+4. **Preservation of Nulls:** Unmeasured micronutrients in `food_nutrient_profiles` remain `null` rather than falsely asserting zero.
 
 ---
 
