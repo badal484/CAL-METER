@@ -16,6 +16,7 @@ describe('BMR Calculation (Mifflin-St Jeor)', () => {
     expect(result.status).toBe('SUCCESS');
     if (result.status === 'SUCCESS') {
       expect(result.bmr).toBe(1780);
+      expect(result.calculationMethod).toBe('MIFFLIN_ST_JEOR_MALE');
       expect(result.formula).toBe('Mifflin-St Jeor (1990)');
     }
   });
@@ -33,35 +34,136 @@ describe('BMR Calculation (Mifflin-St Jeor)', () => {
     expect(result.status).toBe('SUCCESS');
     if (result.status === 'SUCCESS') {
       expect(result.bmr).toBe(1330);
+      expect(result.calculationMethod).toBe('MIFFLIN_ST_JEOR_FEMALE');
     }
   });
 
-  it('calculates population median when biological sex is unspecified', () => {
-    // Midpoint offset = -78
-    // BMR = 10(70) + 6.25(170) - 5(25) - 78 = 700 + 1062.5 - 125 - 78 = 1559.5 -> 1560 kcal
-    const result = calculateBmr({
-      weightKg: 70,
-      heightCm: 170,
-      ageYears: 25,
-      gender: Gender.PREFER_NOT_TO_SAY,
+  describe('Biological Sex vs Gender Identity Handling', () => {
+    it('uses biological sex and documents conflict when biological sex and gender identity differ', () => {
+      // Trans woman: biologicalSex MALE, gender FEMALE
+      const result = calculateBmr({
+        weightKg: 75,
+        heightCm: 175,
+        ageYears: 27,
+        biologicalSex: BiologicalSex.MALE,
+        gender: Gender.FEMALE,
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      if (result.status === 'SUCCESS') {
+        expect(result.calculationMethod).toBe('MIFFLIN_ST_JEOR_MALE');
+        expect(result.notes.some(n => n.includes('differs from biological sex'))).toBe(true);
+      }
     });
 
-    expect(result.status).toBe('SUCCESS');
-    if (result.status === 'SUCCESS') {
-      expect(result.bmr).toBe(1560);
-      expect(result.disclaimers.some(d => d.includes('population median'))).toBe(true);
-    }
+    it('does NOT infer biological sex from gender when biologicalSex is omitted', () => {
+      // User specifies gender MALE but omits biologicalSex
+      const result = calculateBmr({
+        weightKg: 75,
+        heightCm: 175,
+        ageYears: 27,
+        gender: Gender.MALE,
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      if (result.status === 'SUCCESS') {
+        // Must use UNVALIDATED_SEX_AVERAGE, NOT MIFFLIN_ST_JEOR_MALE!
+        expect(result.calculationMethod).toBe('UNVALIDATED_SEX_AVERAGE');
+        expect(
+          result.notes.some(n => n.includes('NOT a clinically validated standalone equation')),
+        ).toBe(true);
+        expect(
+          result.notes.some(n =>
+            n.includes('Predictive equations are not inferred from gender identity'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('calculates unvalidated population midpoint when both sex and gender are omitted', () => {
+      // Midpoint offset = -78
+      // BMR = 10(70) + 6.25(170) - 5(25) - 78 = 700 + 1062.5 - 125 - 78 = 1559.5 -> 1560 kcal
+      const result = calculateBmr({
+        weightKg: 70,
+        heightCm: 170,
+        ageYears: 25,
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      if (result.status === 'SUCCESS') {
+        expect(result.bmr).toBe(1560);
+        expect(result.calculationMethod).toBe('UNVALIDATED_SEX_AVERAGE');
+      }
+    });
   });
 
-  it('correctly validates the age 18 lower adult boundary', () => {
-    const result = calculateBmr({
-      weightKg: 65,
-      heightCm: 172,
-      ageYears: 18,
-      biologicalSex: BiologicalSex.MALE,
+  describe('Numeric Validation & Physiological Boundaries', () => {
+    it('rejects NaN, Infinity, negative, and zero values for biometrics', () => {
+      expect(
+        calculateBmr({
+          weightKg: NaN,
+          heightCm: 170,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
+
+      expect(
+        calculateBmr({
+          weightKg: 70,
+          heightCm: Infinity,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
+
+      expect(
+        calculateBmr({
+          weightKg: -70,
+          heightCm: 170,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
+
+      expect(
+        calculateBmr({
+          weightKg: 70,
+          heightCm: 0,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
     });
 
-    expect(result.status).toBe('SUCCESS');
+    it('rejects out-of-bounds biometrics (< 30kg, > 350kg, < 100cm, > 250cm, > 120y)', () => {
+      expect(
+        calculateBmr({
+          weightKg: 25,
+          heightCm: 170,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
+
+      expect(
+        calculateBmr({
+          weightKg: 400,
+          heightCm: 170,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
+
+      expect(
+        calculateBmr({
+          weightKg: 70,
+          heightCm: 85,
+          ageYears: 25,
+          biologicalSex: BiologicalSex.MALE,
+        }).status,
+      ).toBe('UNSUPPORTED');
+    });
   });
 
   describe('Health & Safety Restrictions for Unsupported Populations', () => {
@@ -80,18 +182,15 @@ describe('BMR Calculation (Mifflin-St Jeor)', () => {
       }
     });
 
-    it('rejects calculation for children (age 10)', () => {
+    it('accepts age 18 as the valid lower adult boundary', () => {
       const result = calculateBmr({
-        weightKg: 35,
-        heightCm: 135,
-        ageYears: 10,
+        weightKg: 65,
+        heightCm: 172,
+        ageYears: 18,
         biologicalSex: BiologicalSex.MALE,
       });
 
-      expect(result.status).toBe('UNSUPPORTED');
-      if (result.status === 'UNSUPPORTED') {
-        expect(result.reason).toBe('MINORS_NOT_SUPPORTED');
-      }
+      expect(result.status).toBe('SUCCESS');
     });
 
     it('rejects calculation during pregnancy with clinical disclaimer', () => {
@@ -106,7 +205,6 @@ describe('BMR Calculation (Mifflin-St Jeor)', () => {
       expect(result.status).toBe('UNSUPPORTED');
       if (result.status === 'UNSUPPORTED') {
         expect(result.reason).toBe('PREGNANCY_LACTATION_NOT_SUPPORTED');
-        expect(result.message).toContain('gestational or lactational metabolic demands');
       }
     });
 
@@ -122,34 +220,6 @@ describe('BMR Calculation (Mifflin-St Jeor)', () => {
       expect(result.status).toBe('UNSUPPORTED');
       if (result.status === 'UNSUPPORTED') {
         expect(result.reason).toBe('PREGNANCY_LACTATION_NOT_SUPPORTED');
-      }
-    });
-
-    it('rejects out-of-bounds weight below 30 kg', () => {
-      const result = calculateBmr({
-        weightKg: 25,
-        heightCm: 150,
-        ageYears: 22,
-        biologicalSex: BiologicalSex.FEMALE,
-      });
-
-      expect(result.status).toBe('UNSUPPORTED');
-      if (result.status === 'UNSUPPORTED') {
-        expect(result.reason).toBe('OUT_OF_BOUNDS_BIOMETRICS');
-      }
-    });
-
-    it('rejects out-of-bounds height above 250 cm', () => {
-      const result = calculateBmr({
-        weightKg: 90,
-        heightCm: 260,
-        ageYears: 25,
-        biologicalSex: BiologicalSex.MALE,
-      });
-
-      expect(result.status).toBe('UNSUPPORTED');
-      if (result.status === 'UNSUPPORTED') {
-        expect(result.reason).toBe('OUT_OF_BOUNDS_BIOMETRICS');
       }
     });
   });

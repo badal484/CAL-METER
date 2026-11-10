@@ -25,17 +25,25 @@ export interface BmrCalculationInput {
   isLactating?: boolean;
 }
 
+export type BmrCalculationMethod =
+  'MIFFLIN_ST_JEOR_MALE' | 'MIFFLIN_ST_JEOR_FEMALE' | 'UNVALIDATED_SEX_AVERAGE';
+
 export type BmrCalculationResult =
   | {
       status: 'SUCCESS';
       bmr: number;
       formula: 'Mifflin-St Jeor (1990)';
+      calculationMethod: BmrCalculationMethod;
+      notes: string[];
       disclaimers: string[];
     }
   | {
       status: 'UNSUPPORTED';
       reason:
-        'MINORS_NOT_SUPPORTED' | 'PREGNANCY_LACTATION_NOT_SUPPORTED' | 'OUT_OF_BOUNDS_BIOMETRICS';
+        | 'MINORS_NOT_SUPPORTED'
+        | 'PREGNANCY_LACTATION_NOT_SUPPORTED'
+        | 'OUT_OF_BOUNDS_BIOMETRICS'
+        | 'INVALID_BIOMETRICS';
       message: string;
     };
 
@@ -56,7 +64,7 @@ export interface CalorieTargetInput {
   tdee: number;
   bmr: number;
   primaryGoal: PrimaryGoal;
-  paceKgPerWeek?: number; // Recommended 0.25 to 1.0 kg/week
+  paceKgPerWeek?: number; // e.g. 0.25 to 1.0 kg/week for fat loss
   customCalorieOverride?: number;
 }
 
@@ -118,6 +126,10 @@ export type ServingConversionResult =
     }
   | {
       success: false;
-      error: 'UNSUPPORTED_UNIT_FOR_FOOD' | 'INVALID_QUANTITY' | 'MISSING_FOOD_CONVERSION';
+      error:
+        | 'UNSUPPORTED_UNIT_FOR_FOOD'
+        | 'INVALID_QUANTITY'
+        | 'INVALID_CONVERSION_FACTOR'
+        | 'MISSING_FOOD_CONVERSION';
       message: string;
     };

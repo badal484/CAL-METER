@@ -5,6 +5,7 @@ import {
   REFERENCE_SERVING_PROFILES,
 } from '../src/servings/serving-units.js';
 import { ServingProvenance } from '../src/constants/enums.js';
+import { FoodServingConversion } from '../src/types/index.js';
 
 describe('Food-Specific Serving Unit Conversions', () => {
   it('converts Dal Tadka katori using specific density (1 katori = 200g)', () => {
@@ -13,7 +14,8 @@ describe('Food-Specific Serving Unit Conversions', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.gramWeight).toBe(300); // 1.5 * 200g
-      expect(result.provenance).toBe(ServingProvenance.ICMR_NIN_IFCT);
+      expect(result.provenance).toBe(ServingProvenance.ESTIMATED_HOUSEHOLD);
+      expect(result.notes).toContain('Illustrative household estimate');
     }
   });
 
@@ -53,7 +55,6 @@ describe('Food-Specific Serving Unit Conversions', () => {
   });
 
   it('returns explicit unsupported error when a unit is not registered for that food', () => {
-    // Attempting to ask for "roti" of Dal Tadka
     const result = convertServingToGrams(REFERENCE_SERVING_PROFILES.DAL_TADKA, 'roti', 2);
 
     expect(result.success).toBe(false);
@@ -63,12 +64,57 @@ describe('Food-Specific Serving Unit Conversions', () => {
     }
   });
 
-  it('rejects negative serving quantity', () => {
-    const result = convertServingToGrams(REFERENCE_SERVING_PROFILES.DAL_TADKA, 'katori', -1);
+  it('rejects negative, NaN, and Infinity serving quantity', () => {
+    const negResult = convertServingToGrams(REFERENCE_SERVING_PROFILES.DAL_TADKA, 'katori', -1);
+    expect(negResult.success).toBe(false);
+    if (!negResult.success) {
+      expect(negResult.error).toBe('INVALID_QUANTITY');
+    }
 
+    const nanResult = convertServingToGrams(REFERENCE_SERVING_PROFILES.DAL_TADKA, 'katori', NaN);
+    expect(nanResult.success).toBe(false);
+    if (!nanResult.success) {
+      expect(nanResult.error).toBe('INVALID_QUANTITY');
+    }
+
+    const infResult = convertServingToGrams(
+      REFERENCE_SERVING_PROFILES.DAL_TADKA,
+      'katori',
+      Infinity,
+    );
+    expect(infResult.success).toBe(false);
+    if (!infResult.success) {
+      expect(infResult.error).toBe('INVALID_QUANTITY');
+    }
+  });
+
+  it('rejects invalid or non-positive conversion factor registered for a food', () => {
+    const invalidFactorConversions: FoodServingConversion[] = [
+      {
+        unit: 'bowl',
+        gramWeight: 0, // non-positive
+        provenance: ServingProvenance.USER_CONFIGURED,
+      },
+    ];
+
+    const result = convertServingToGrams(invalidFactorConversions, 'bowl', 2);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe('INVALID_QUANTITY');
+      expect(result.error).toBe('INVALID_CONVERSION_FACTOR');
+    }
+
+    const nanFactorConversions: FoodServingConversion[] = [
+      {
+        unit: 'bowl',
+        gramWeight: NaN,
+        provenance: ServingProvenance.USER_CONFIGURED,
+      },
+    ];
+
+    const nanResult = convertServingToGrams(nanFactorConversions, 'bowl', 2);
+    expect(nanResult.success).toBe(false);
+    if (!nanResult.success) {
+      expect(nanResult.error).toBe('INVALID_CONVERSION_FACTOR');
     }
   });
 
@@ -91,5 +137,31 @@ describe('Food-Specific Serving Unit Conversions', () => {
     if (result.success) {
       expect(result.quantity).toBe(2);
     }
+  });
+
+  it('rejects negative, NaN, and Infinity in convertGramsToServing', () => {
+    expect(
+      convertGramsToServing(REFERENCE_SERVING_PROFILES.DAL_TADKA, -100, 'katori').success,
+    ).toBe(false);
+    expect(convertGramsToServing(REFERENCE_SERVING_PROFILES.DAL_TADKA, NaN, 'katori').success).toBe(
+      false,
+    );
+    expect(
+      convertGramsToServing(REFERENCE_SERVING_PROFILES.DAL_TADKA, Infinity, 'katori').success,
+    ).toBe(false);
+  });
+
+  it('verifies reference serving profiles do not use unverified ICMR provenance and have valid provenance', () => {
+    Object.values(REFERENCE_SERVING_PROFILES).forEach(profileList => {
+      profileList.forEach(conv => {
+        expect(conv.provenance).not.toBe(ServingProvenance.ICMR_NIN_IFCT);
+        expect(
+          conv.provenance === ServingProvenance.ESTIMATED_HOUSEHOLD ||
+            conv.provenance === ServingProvenance.USDA,
+        ).toBe(true);
+        expect(conv.notes).toBeDefined();
+        expect(conv.gramWeight).toBeGreaterThan(0);
+      });
+    });
   });
 });

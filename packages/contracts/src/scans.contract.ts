@@ -11,6 +11,7 @@ export const PresignUploadRequestSchema = z.object({
   fileSizeBytes: z
     .number()
     .int()
+    .finite()
     .positive()
     .max(10 * 1024 * 1024, {
       message: 'Image size cannot exceed 10 MB.',
@@ -21,7 +22,7 @@ export const PresignUploadResponseSchema = z.object({
   scanId: UuidSchema,
   uploadUrl: z.string().url(),
   storageKey: z.string().min(1),
-  expiresInSeconds: z.number().int().positive(),
+  expiresInSeconds: z.number().int().finite().positive(),
 });
 
 export const AnalyzeScanRequestSchema = z.object({
@@ -30,9 +31,9 @@ export const AnalyzeScanRequestSchema = z.object({
 });
 
 export const DetectedPortionSchema = z.object({
-  quantity: z.number().positive(),
+  quantity: z.number().finite().positive(),
   unit: z.string().min(1),
-  estimatedWeightGrams: z.number().positive(),
+  estimatedWeightGrams: z.number().finite().positive(),
 });
 
 export const DetectedFoodItemSchema = z.object({
@@ -42,7 +43,7 @@ export const DetectedFoodItemSchema = z.object({
   cuisine: z.string().optional(),
   cookingMethod: z.string().optional(),
   portion: DetectedPortionSchema,
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().finite().min(0).max(1),
   visualIndicators: z
     .object({
       oilSheen: z.enum(['DRY', 'MODERATE', 'HEAVY']).optional(),
@@ -53,10 +54,10 @@ export const DetectedFoodItemSchema = z.object({
       id: UuidSchema,
       name: z.string(),
       source: z.string(),
-      calories: z.number(),
-      protein: z.number(),
-      carbs: z.number(),
-      fat: z.number(),
+      calories: z.number().finite().nonnegative(),
+      protein: z.number().finite().nonnegative(),
+      carbs: z.number().finite().nonnegative(),
+      fat: z.number().finite().nonnegative(),
     })
     .optional(),
 });
@@ -64,9 +65,9 @@ export const DetectedFoodItemSchema = z.object({
 export const FoodScanResponseSchema = z.object({
   scanId: UuidSchema,
   status: ScanStatusSchema,
-  latencyMs: z.number().int().optional(),
+  latencyMs: z.number().int().finite().nonnegative().optional(),
   detectedItems: z.array(DetectedFoodItemSchema).default([]),
-  totalEstimatedCalories: z.number().optional(),
+  totalEstimatedCalories: z.number().finite().nonnegative().optional(),
   uncertaintyNotes: z.array(z.string()).default([]),
 });
 

@@ -1,20 +1,24 @@
 import { z } from 'zod';
+import { isValidIsoDate } from '@calmeter/shared';
 
 export const UuidSchema = z.string().uuid({ message: 'Must be a valid UUID v4 format.' });
 
 export const IsoDateStringSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be formatted as YYYY-MM-DD.' });
+  .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be formatted as YYYY-MM-DD.' })
+  .refine(isValidIsoDate, {
+    message: 'Date must be a valid existing calendar date in YYYY-MM-DD format.',
+  });
 
 export const PaginationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().finite().min(1).default(1),
+  limit: z.coerce.number().int().finite().min(1).max(100).default(20),
 });
 
 export const PaginationMetaSchema = z.object({
-  page: z.number().int().min(1),
-  limit: z.number().int().min(1),
-  total: z.number().int().min(0),
+  page: z.number().int().finite().min(1),
+  limit: z.number().int().finite().min(1),
+  total: z.number().int().finite().min(0),
 });
 
 export const ApiErrorDetailSchema = z.object({

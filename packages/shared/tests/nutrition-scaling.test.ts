@@ -12,8 +12,8 @@ describe('Nutrition Scaling', () => {
     fiberGrams: 0,
     micronutrients: {
       ironMg: 1.04,
-      sodiumMg: 74
-    }
+      sodiumMg: 74,
+    },
   };
 
   it('correctly scales nutrients from 100g to 250g (factor 2.5)', () => {
@@ -47,7 +47,7 @@ describe('Nutrition Scaling', () => {
       calories: 220,
       proteinGrams: 4,
       carbsGrams: 28,
-      fatGrams: 11
+      fatGrams: 11,
     };
 
     const scaled = scaleNutrients(packageNutrients, 90, 45); // 2 packages
@@ -57,12 +57,60 @@ describe('Nutrition Scaling', () => {
     expect(scaled.fatGrams).toBe(22);
   });
 
-  it('throws DomainValidationError for negative target grams', () => {
-    expect(() => scaleNutrients(basePer100g, -50, 100)).toThrow(DomainValidationError);
-  });
+  describe('Numeric Validation & Error Handling', () => {
+    it('throws DomainValidationError for negative or non-finite target grams', () => {
+      expect(() => scaleNutrients(basePer100g, -50, 100)).toThrow(DomainValidationError);
+      expect(() => scaleNutrients(basePer100g, NaN, 100)).toThrow(DomainValidationError);
+      expect(() => scaleNutrients(basePer100g, Infinity, 100)).toThrow(DomainValidationError);
+    });
 
-  it('throws DomainValidationError for zero or negative reference grams', () => {
-    expect(() => scaleNutrients(basePer100g, 100, 0)).toThrow(DomainValidationError);
+    it('throws DomainValidationError for zero, negative, or non-finite reference grams', () => {
+      expect(() => scaleNutrients(basePer100g, 100, 0)).toThrow(DomainValidationError);
+      expect(() => scaleNutrients(basePer100g, 100, -100)).toThrow(DomainValidationError);
+      expect(() => scaleNutrients(basePer100g, 100, NaN)).toThrow(DomainValidationError);
+    });
+
+    it('throws DomainValidationError if base profile contains negative nutrients', () => {
+      expect(() =>
+        scaleNutrients(
+          {
+            calories: -100,
+            proteinGrams: 10,
+            carbsGrams: 10,
+            fatGrams: 5,
+          },
+          100,
+          100,
+        ),
+      ).toThrow(DomainValidationError);
+
+      expect(() =>
+        scaleNutrients(
+          {
+            calories: 100,
+            proteinGrams: 10,
+            carbsGrams: -5,
+            fatGrams: 5,
+          },
+          100,
+          100,
+        ),
+      ).toThrow(DomainValidationError);
+    });
+
+    it('throws DomainValidationError if base profile contains non-finite nutrients (NaN, Infinity)', () => {
+      expect(() =>
+        scaleNutrients(
+          {
+            calories: NaN,
+            proteinGrams: 10,
+            carbsGrams: 10,
+            fatGrams: 5,
+          },
+          100,
+          100,
+        ),
+      ).toThrow(DomainValidationError);
+    });
   });
 });
-

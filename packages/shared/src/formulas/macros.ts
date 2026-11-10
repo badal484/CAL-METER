@@ -6,11 +6,16 @@ import { roundTo } from '../utils/measurements.js';
 /**
  * Calculates deterministic macronutrient gram and calorie targets.
  *
- * Rules:
+ * Rules & Energetic Densities (Atwater Factors):
  * - Protein yields 4 kcal/gram.
  * - Carbohydrates yield 4 kcal/gram.
  * - Fat yields 9 kcal/gram.
  * - Fiber recommendations default to 14g per 1,000 kcal (Dietary Reference Intake).
+ *
+ * Rounding Specification:
+ * - Macronutrient grams and fiber are rounded to 1 decimal place (`roundTo(val, 1)`).
+ * - Calorie contributions from individual macronutrients are rounded to whole numbers (`roundTo(val, 0)`).
+ * - Fractional percentages are rounded to 3 decimal places (`roundTo(val, 3)`).
  */
 export function calculateMacronutrients(input: MacroCalculationInput): MacroTargetResult {
   const {
@@ -23,18 +28,39 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
     customFatGrams,
   } = input;
 
-  if (dailyCalories <= 0) {
-    throw new DomainValidationError('Daily calories must be greater than zero.');
+  if (!Number.isFinite(dailyCalories) || dailyCalories <= 0) {
+    throw new DomainValidationError(
+      `Daily calories must be a positive finite number (received: ${dailyCalories}).`,
+    );
   }
 
-  // If custom gram amounts are explicitly supplied
+  // Check for partial custom macro inputs
+  const customProvided = [customProteinGrams, customCarbsGrams, customFatGrams].filter(
+    v => v !== undefined,
+  );
+
+  if (customProvided.length > 0 && customProvided.length < 3) {
+    throw new DomainValidationError(
+      'All three custom macronutrient gram values (protein, carbs, fat) must be provided together. Partial custom inputs are not permitted.',
+    );
+  }
+
+  // If complete custom gram amounts are explicitly supplied
   if (
     customProteinGrams !== undefined &&
     customCarbsGrams !== undefined &&
     customFatGrams !== undefined
   ) {
+    if (
+      !Number.isFinite(customProteinGrams) ||
+      !Number.isFinite(customCarbsGrams) ||
+      !Number.isFinite(customFatGrams)
+    ) {
+      throw new DomainValidationError('Custom macronutrient gram values must be finite numbers.');
+    }
+
     if (customProteinGrams < 0 || customCarbsGrams < 0 || customFatGrams < 0) {
-      throw new DomainValidationError('Macronutrient gram values cannot be negative.');
+      throw new DomainValidationError('Custom macronutrient gram values cannot be negative.');
     }
 
     const proteinCalories = roundTo(customProteinGrams * ATWATER_FACTORS.PROTEIN, 0);
@@ -50,9 +76,9 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
 
     return {
       dailyCalories,
-      proteinGrams: customProteinGrams,
-      carbsGrams: customCarbsGrams,
-      fatGrams: customFatGrams,
+      proteinGrams: roundTo(customProteinGrams, 1),
+      carbsGrams: roundTo(customCarbsGrams, 1),
+      fatGrams: roundTo(customFatGrams, 1),
       fiberGrams,
       proteinCalories,
       carbsCalories,
@@ -63,7 +89,25 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
     };
   }
 
-  // Percentage-based calculation
+  // Validate percentage inputs individually
+  if (
+    !Number.isFinite(proteinPercentage) ||
+    !Number.isFinite(carbsPercentage) ||
+    !Number.isFinite(fatPercentage)
+  ) {
+    throw new DomainValidationError('Macronutrient percentages must be finite numbers.');
+  }
+
+  if (proteinPercentage < 0 || carbsPercentage < 0 || fatPercentage < 0) {
+    throw new DomainValidationError('Macronutrient percentages cannot be negative.');
+  }
+
+  if (proteinPercentage > 1 || carbsPercentage > 1 || fatPercentage > 1) {
+    throw new DomainValidationError(
+      'Individual macronutrient percentages cannot exceed 1.0 (100%).',
+    );
+  }
+
   const sumOfPercentages = proteinPercentage + carbsPercentage + fatPercentage;
   if (Math.abs(sumOfPercentages - 1.0) > 0.015) {
     throw new DomainValidationError(

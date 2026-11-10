@@ -14,7 +14,7 @@ describe('Calorie Target Calculation', () => {
       tdee,
       bmr,
       primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-      paceKgPerWeek: 0.5
+      paceKgPerWeek: 0.5,
     });
 
     expect(result.dailyCalories).toBe(1950);
@@ -29,7 +29,7 @@ describe('Calorie Target Calculation', () => {
     const result = calculateCalorieTarget({
       tdee,
       bmr,
-      primaryGoal: PrimaryGoal.MAINTAIN_WEIGHT
+      primaryGoal: PrimaryGoal.MAINTAIN_WEIGHT,
     });
 
     expect(result.dailyCalories).toBe(2500);
@@ -42,74 +42,146 @@ describe('Calorie Target Calculation', () => {
     const result = calculateCalorieTarget({
       tdee,
       bmr,
-      primaryGoal: PrimaryGoal.BUILD_MUSCLE
+      primaryGoal: PrimaryGoal.BUILD_MUSCLE,
     });
 
     expect(result.dailyCalories).toBe(2750);
     expect(result.dailyDeficitOrSurplus).toBe(250);
   });
 
-  describe('Health & Safety Boundary Warnings', () => {
-    it('flags aggressive deficit warning when target deficit exceeds 25% of TDEE', () => {
-      // 0.9 kg/week -> (0.9 * 7700) / 7 = 990 kcal deficit
-      // 990 / 2500 = 39.6% deficit
+  describe('Removal of Arbitrary Floors & Transparent Calculation', () => {
+    it('calculates targets below 800 kcal transparently without clamping to an arbitrary floor', () => {
+      // TDEE 2000, BMR 1500, deficit of 1400 kcal (approx 1.27 kg/week)
+      // 2000 - 1400 = 600 kcal. Must NOT clamp to 800!
       const result = calculateCalorieTarget({
-        tdee,
-        bmr,
+        tdee: 2000,
+        bmr: 1500,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        paceKgPerWeek: 0.9
+        paceKgPerWeek: 1.2727,
       });
 
-      expect(result.deficitPercentageOfTdee).toBeGreaterThan(25);
+      expect(result.dailyCalories).toBe(600); // Transparent 600 kcal, not clamped to 800!
+      expect(result.isBelowBmr).toBe(true);
+      expect(result.warnings.some(w => w.includes('below your estimated resting BMR'))).toBe(true);
       expect(result.warnings.some(w => w.includes('exceeds 25% of TDEE'))).toBe(true);
     });
 
-    it('flags warning when aggressive pace exceeds 1.0 kg/week', () => {
+    it('flags non-viable targets (<= 0 kcal) with explicit safety warning without clamping', () => {
+      // Requested pace 3.0 kg/week -> deficit = (3.0 * 7700) / 7 = 3300 kcal
+      // Target = 2000 - 3300 = -1300 kcal
+      const result = calculateCalorieTarget({
+        tdee: 2000,
+        bmr: 1500,
+        primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+        paceKgPerWeek: 3.0,
+      });
+
+      expect(result.dailyCalories).toBe(-1300);
+      expect(result.warnings.some(w => w.includes('non-viable'))).toBe(true);
+    });
+
+    it('does not silently alter requested pace', () => {
       const result = calculateCalorieTarget({
         tdee,
         bmr,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        paceKgPerWeek: 1.2
+        paceKgPerWeek: 1.5,
       });
 
+      // Pace remains 1.5, not clamped to 0.5 or 1.0!
+      expect(result.paceKgPerWeek).toBe(1.5);
       expect(result.warnings.some(w => w.includes('considered aggressive'))).toBe(true);
     });
 
-    it('flags warning when target calories dip below BMR', () => {
-      // TDEE: 1800, BMR: 1500, deficit: 550 -> Target: 1250 (< 1500 BMR)
-      const result = calculateCalorieTarget({
-        tdee: 1800,
-        bmr: 1500,
-        primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        paceKgPerWeek: 0.5
-      });
-
-      expect(result.isBelowBmr).toBe(true);
-      expect(result.warnings.some(w => w.includes('below your estimated resting BMR'))).toBe(true);
-    });
-
-    it('accepts valid custom calorie override and checks safety implications', () => {
+    it('allows custom calorie overrides below 500 kcal without arbitrary rejection', () => {
+      // User sets custom 450 kcal
       const result = calculateCalorieTarget({
         tdee,
         bmr,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        customCalorieOverride: 1800
+        customCalorieOverride: 450,
       });
 
-      expect(result.dailyCalories).toBe(1800);
-      expect(result.dailyDeficitOrSurplus).toBe(-700);
+      expect(result.dailyCalories).toBe(450);
+      expect(result.warnings.some(w => w.includes('aggressive deficit'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('below your estimated resting BMR'))).toBe(true);
+    });
+  });
+
+  describe('Input Validation & Error Handling', () => {
+    it('rejects non-finite, zero, and negative TDEE and BMR', () => {
+      expect(() =>
+        calculateCalorieTarget({
+          tdee: NaN,
+          bmr: 1500,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+        }),
+      ).toThrow(DomainValidationError);
+
+      expect(() =>
+        calculateCalorieTarget({
+          tdee: 2000,
+          bmr: -1500,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+        }),
+      ).toThrow(DomainValidationError);
+
+      expect(() =>
+        calculateCalorieTarget({
+          tdee: 0,
+          bmr: 1500,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+        }),
+      ).toThrow(DomainValidationError);
     });
 
-    it('rejects extreme custom calorie override (< 500 kcal)', () => {
+    it('rejects non-finite, zero, and negative weight loss pace', () => {
       expect(() =>
         calculateCalorieTarget({
           tdee,
           bmr,
           primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-          customCalorieOverride: 400
-        })
+          paceKgPerWeek: -0.5,
+        }),
+      ).toThrow(DomainValidationError);
+
+      expect(() =>
+        calculateCalorieTarget({
+          tdee,
+          bmr,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+          paceKgPerWeek: 0,
+        }),
+      ).toThrow(DomainValidationError);
+
+      expect(() =>
+        calculateCalorieTarget({
+          tdee,
+          bmr,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+          paceKgPerWeek: NaN,
+        }),
+      ).toThrow(DomainValidationError);
+    });
+
+    it('rejects non-finite and negative custom calorie overrides', () => {
+      expect(() =>
+        calculateCalorieTarget({
+          tdee,
+          bmr,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+          customCalorieOverride: -500,
+        }),
+      ).toThrow(DomainValidationError);
+
+      expect(() =>
+        calculateCalorieTarget({
+          tdee,
+          bmr,
+          primaryGoal: PrimaryGoal.LOSE_WEIGHT,
+          customCalorieOverride: NaN,
+        }),
       ).toThrow(DomainValidationError);
     });
   });
 });
-

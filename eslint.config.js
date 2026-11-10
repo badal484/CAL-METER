@@ -8,18 +8,18 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         console: 'readonly',
-        process: 'readonly'
-      }
+        process: 'readonly',
+      },
     },
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn'
-    }
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
   },
   {
     ignores: [
@@ -28,7 +28,7 @@ export default tseslint.config(
       '**/build/**',
       '**/coverage/**',
       'apps/mobile/android/**',
-      'apps/mobile/ios/**'
-    ]
-  }
+      'apps/mobile/ios/**',
+    ],
+  },
 );

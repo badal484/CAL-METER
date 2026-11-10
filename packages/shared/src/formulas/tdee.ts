@@ -10,14 +10,14 @@ import { roundTo } from '../utils/measurements.js';
 export function calculateTdee(input: TdeeCalculationInput): TdeeCalculationResult {
   const { bmr, activityLevel } = input;
 
-  if (bmr < 500 || bmr > 5000) {
+  if (!Number.isFinite(bmr) || bmr < 500 || bmr > 5000) {
     throw new DomainValidationError(
-      `BMR value ${bmr} kcal is outside plausible physiological limits.`,
+      `BMR must be a finite positive number between 500 and 5,000 kcal (received: ${bmr}).`,
     );
   }
 
   const multiplier = ACTIVITY_MULTIPLIERS[activityLevel];
-  if (!multiplier) {
+  if (!multiplier || !Number.isFinite(multiplier)) {
     throw new DomainValidationError(`Unsupported or invalid activity level: ${activityLevel}`);
   }
 

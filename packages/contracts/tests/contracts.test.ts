@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  IsoDateStringSchema,
   OnboardingDataSchema,
+  NutritionGoalSchema,
   UpdateNutritionGoalSchema,
   PresignUploadRequestSchema,
   CommitMealRequestSchema,
   LogWeightSchema,
+  LogWaterSchema,
   FoodServingConversionSchema,
 } from '../src/index.js';
 import {
@@ -19,6 +22,30 @@ import {
 } from '@calmeter/shared';
 
 describe('Contracts Runtime Schema Validation', () => {
+  describe('IsoDateStringSchema', () => {
+    it('accepts valid calendar dates in ISO YYYY-MM-DD format', () => {
+      expect(IsoDateStringSchema.safeParse('2026-11-10').success).toBe(true);
+      expect(IsoDateStringSchema.safeParse('2024-02-29').success).toBe(true); // Leap day
+      expect(IsoDateStringSchema.safeParse('1995-06-15').success).toBe(true);
+    });
+
+    it('rejects impossible calendar dates', () => {
+      expect(IsoDateStringSchema.safeParse('2026-02-30').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('2026-13-01').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('2025-02-29').success).toBe(false); // Non-leap year
+      expect(IsoDateStringSchema.safeParse('2026-04-31').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('2026-00-10').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('2026-05-00').success).toBe(false);
+    });
+
+    it('rejects malformed date strings', () => {
+      expect(IsoDateStringSchema.safeParse('15/06/1995').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('2026.11.10').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('not-a-date').success).toBe(false);
+      expect(IsoDateStringSchema.safeParse('').success).toBe(false);
+    });
+  });
+
   describe('OnboardingDataSchema', () => {
     const validOnboarding = {
       gender: Gender.MALE,
@@ -61,19 +88,48 @@ describe('Contracts Runtime Schema Validation', () => {
       }
     });
 
-    it('rejects malformed date of birth string', () => {
-      const parsed = OnboardingDataSchema.safeParse({
+    it('rejects non-finite biometrics (NaN, Infinity)', () => {
+      expect(OnboardingDataSchema.safeParse({ ...validOnboarding, heightCm: NaN }).success).toBe(
+        false,
+      );
+      expect(
+        OnboardingDataSchema.safeParse({ ...validOnboarding, currentWeightKg: Infinity }).success,
+      ).toBe(false);
+      expect(
+        OnboardingDataSchema.safeParse({ ...validOnboarding, paceKgPerWeek: NaN }).success,
+      ).toBe(false);
+    });
+
+    it('rejects malformed or impossible date of birth string', () => {
+      expect(
+        OnboardingDataSchema.safeParse({ ...validOnboarding, dob: '15/06/1995' }).success,
+      ).toBe(false);
+      expect(
+        OnboardingDataSchema.safeParse({ ...validOnboarding, dob: '2026-02-30' }).success,
+      ).toBe(false);
+      expect(
+        OnboardingDataSchema.safeParse({ ...validOnboarding, dob: '2026-13-01' }).success,
+      ).toBe(false);
+    });
+
+    it('rejects date of birth in the future or age exceeding 120 years', () => {
+      // Future date
+      const futureParsed = OnboardingDataSchema.safeParse({
         ...validOnboarding,
-        dob: '15/06/1995', // Non-ISO format
+        dob: '2030-01-01',
       });
-      expect(parsed.success).toBe(false);
-      if (!parsed.success) {
-        expect(parsed.error.issues[0]?.path).toContain('dob');
-      }
+      expect(futureParsed.success).toBe(false);
+
+      // Unrealistic age (> 120)
+      const ancientParsed = OnboardingDataSchema.safeParse({
+        ...validOnboarding,
+        dob: '1890-01-01',
+      });
+      expect(ancientParsed.success).toBe(false);
     });
   });
 
-  describe('UpdateNutritionGoalSchema', () => {
+  describe('NutritionGoalSchema & UpdateNutritionGoalSchema', () => {
     it('accepts valid macro and calorie goals', () => {
       const valid = {
         dailyCalories: 2100,
@@ -87,14 +143,43 @@ describe('Contracts Runtime Schema Validation', () => {
       expect(parsed.success).toBe(true);
     });
 
-    it('rejects dailyCalories below 500 kcal', () => {
+    it('accepts dailyCalories below 500 kcal without an arbitrary floor', () => {
+      // Policy Part 2.1: removed arbitrary 500 kcal floor
       const parsed = UpdateNutritionGoalSchema.safeParse({
         dailyCalories: 400,
         proteinGrams: 50,
         carbsGrams: 50,
         fatGrams: 10,
       });
-      expect(parsed.success).toBe(false);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('rejects non-positive dailyCalories (0 or negative)', () => {
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          dailyCalories: 0,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          dailyCalories: -100,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects non-finite dailyCalories (NaN, Infinity)', () => {
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          dailyCalories: NaN,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          dailyCalories: Infinity,
+        }).success,
+      ).toBe(false);
     });
 
     it('rejects negative macronutrient grams', () => {
@@ -105,6 +190,40 @@ describe('Contracts Runtime Schema Validation', () => {
         fatGrams: 60,
       });
       expect(parsed.success).toBe(false);
+    });
+
+    it('rejects non-finite macronutrient grams (NaN, Infinity)', () => {
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          proteinGrams: NaN,
+        }).success,
+      ).toBe(false);
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          carbsGrams: Infinity,
+        }).success,
+      ).toBe(false);
+      expect(
+        UpdateNutritionGoalSchema.safeParse({
+          fatGrams: -Infinity,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates complete NutritionGoalSchema', () => {
+      const valid = {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        userId: '123e4567-e89b-12d3-a456-426614174001',
+        dailyCalories: 2200,
+        proteinGrams: 140,
+        carbsGrams: 250,
+        fatGrams: 70,
+        fiberGrams: 35,
+        waterMl: 3000,
+        effectiveDate: '2026-11-10',
+        createdAt: '2026-11-10T12:00:00.000Z',
+      };
+      expect(NutritionGoalSchema.safeParse(valid).success).toBe(true);
     });
   });
 
@@ -142,6 +261,21 @@ describe('Contracts Runtime Schema Validation', () => {
         }).success,
       ).toBe(false);
     });
+
+    it('rejects non-finite or negative fileSizeBytes', () => {
+      expect(
+        PresignUploadRequestSchema.safeParse({
+          contentType: 'image/jpeg',
+          fileSizeBytes: NaN,
+        }).success,
+      ).toBe(false);
+      expect(
+        PresignUploadRequestSchema.safeParse({
+          contentType: 'image/jpeg',
+          fileSizeBytes: -1,
+        }).success,
+      ).toBe(false);
+    });
   });
 
   describe('FoodServingConversionSchema', () => {
@@ -150,20 +284,37 @@ describe('Contracts Runtime Schema Validation', () => {
         unit: 'katori',
         gramWeight: 200,
         volumeMl: 200,
-        provenance: ServingProvenance.ICMR_NIN_IFCT,
-        notes: 'Standard Indian 200ml katori',
+        provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
+        notes: 'Illustrative household estimate for 200ml katori',
       };
       const parsed = FoodServingConversionSchema.safeParse(valid);
       expect(parsed.success).toBe(true);
     });
 
-    it('rejects non-positive gramWeight', () => {
-      const invalid = {
-        unit: 'roti',
-        gramWeight: 0,
-        provenance: ServingProvenance.USER_CONFIGURED,
-      };
-      expect(FoodServingConversionSchema.safeParse(invalid).success).toBe(false);
+    it('rejects non-positive or non-finite gramWeight', () => {
+      expect(
+        FoodServingConversionSchema.safeParse({
+          unit: 'roti',
+          gramWeight: 0,
+          provenance: ServingProvenance.USER_CONFIGURED,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        FoodServingConversionSchema.safeParse({
+          unit: 'roti',
+          gramWeight: -35,
+          provenance: ServingProvenance.USER_CONFIGURED,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        FoodServingConversionSchema.safeParse({
+          unit: 'roti',
+          gramWeight: NaN,
+          provenance: ServingProvenance.USER_CONFIGURED,
+        }).success,
+      ).toBe(false);
     });
   });
 
@@ -203,9 +354,70 @@ describe('Contracts Runtime Schema Validation', () => {
         expect(parsed.error.issues[0]?.message).toContain('at least one food item');
       }
     });
+
+    it('rejects items with non-finite or negative nutrients', () => {
+      const invalidItem = {
+        date: '2026-11-10',
+        mealType: MealType.LUNCH,
+        items: [
+          {
+            foodName: 'Yellow Dal Tadka',
+            portionAmount: 1,
+            servingUnit: 'katori',
+            gramWeight: 200,
+            calories: NaN,
+            protein: 9.2,
+            carbs: 24.5,
+            fat: 5.6,
+            loggedMethod: LoggedMethod.AI_PHOTO,
+          },
+        ],
+      };
+      expect(CommitMealRequestSchema.safeParse(invalidItem).success).toBe(false);
+
+      const negativeItem = {
+        date: '2026-11-10',
+        mealType: MealType.LUNCH,
+        items: [
+          {
+            foodName: 'Yellow Dal Tadka',
+            portionAmount: 1,
+            servingUnit: 'katori',
+            gramWeight: 200,
+            calories: 184,
+            protein: -5,
+            carbs: 24.5,
+            fat: 5.6,
+            loggedMethod: LoggedMethod.AI_PHOTO,
+          },
+        ],
+      };
+      expect(CommitMealRequestSchema.safeParse(negativeItem).success).toBe(false);
+    });
+
+    it('rejects impossible calendar date in meal commit', () => {
+      const invalidDate = {
+        date: '2026-02-30',
+        mealType: MealType.LUNCH,
+        items: [
+          {
+            foodName: 'Yellow Dal Tadka',
+            portionAmount: 1,
+            servingUnit: 'katori',
+            gramWeight: 200,
+            calories: 184,
+            protein: 9.2,
+            carbs: 24.5,
+            fat: 5.6,
+            loggedMethod: LoggedMethod.AI_PHOTO,
+          },
+        ],
+      };
+      expect(CommitMealRequestSchema.safeParse(invalidDate).success).toBe(false);
+    });
   });
 
-  describe('LogWeightSchema', () => {
+  describe('LogWeightSchema & LogWaterSchema', () => {
     it('validates a normal weight reading', () => {
       expect(LogWeightSchema.safeParse({ weightKg: 78.4 }).success).toBe(true);
     });
@@ -213,6 +425,22 @@ describe('Contracts Runtime Schema Validation', () => {
     it('rejects out of bounds weight (< 30 kg or > 350 kg)', () => {
       expect(LogWeightSchema.safeParse({ weightKg: 25 }).success).toBe(false);
       expect(LogWeightSchema.safeParse({ weightKg: 400 }).success).toBe(false);
+    });
+
+    it('rejects non-finite weight (NaN, Infinity)', () => {
+      expect(LogWeightSchema.safeParse({ weightKg: NaN }).success).toBe(false);
+      expect(LogWeightSchema.safeParse({ weightKg: Infinity }).success).toBe(false);
+    });
+
+    it('validates LogWaterSchema and rejects non-finite or out-of-range ml', () => {
+      const base = { date: '2026-11-10' };
+      expect(LogWaterSchema.safeParse({ ...base, amountMl: 500 }).success).toBe(true);
+      expect(LogWaterSchema.safeParse({ ...base, amountMl: 0 }).success).toBe(false);
+      expect(LogWaterSchema.safeParse({ ...base, amountMl: -250 }).success).toBe(false);
+      expect(LogWaterSchema.safeParse({ ...base, amountMl: NaN }).success).toBe(false);
+      expect(LogWaterSchema.safeParse({ ...base, amountMl: Infinity }).success).toBe(false);
+      expect(LogWaterSchema.safeParse({ ...base, amountMl: 6000 }).success).toBe(false); // > 5000 limit
+      expect(LogWaterSchema.safeParse({ date: '2026-02-30', amountMl: 500 }).success).toBe(false);
     });
   });
 });

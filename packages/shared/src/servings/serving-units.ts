@@ -35,11 +35,11 @@ export function convertServingToGrams(
   unit: string,
   quantity: number,
 ): ServingConversionResult {
-  if (quantity < 0) {
+  if (!Number.isFinite(quantity) || quantity < 0) {
     return {
       success: false,
       error: 'INVALID_QUANTITY',
-      message: `Serving quantity cannot be negative (received: ${quantity}).`,
+      message: `Serving quantity must be a non-negative finite number (received: ${quantity}).`,
     };
   }
 
@@ -67,6 +67,14 @@ export function convertServingToGrams(
     };
   }
 
+  if (!Number.isFinite(match.gramWeight) || match.gramWeight <= 0) {
+    return {
+      success: false,
+      error: 'INVALID_CONVERSION_FACTOR',
+      message: `Invalid conversion factor registered for unit "${unit}". Gram weight must be a positive finite number (found: ${match.gramWeight}).`,
+    };
+  }
+
   const totalGrams = roundTo(quantity * match.gramWeight, 1);
 
   return {
@@ -88,11 +96,11 @@ export function convertGramsToServing(
   targetGrams: number,
   targetUnit: string,
 ): ServingConversionResult {
-  if (targetGrams < 0) {
+  if (!Number.isFinite(targetGrams) || targetGrams < 0) {
     return {
       success: false,
       error: 'INVALID_QUANTITY',
-      message: `Gram weight cannot be negative (received: ${targetGrams}).`,
+      message: `Gram weight must be a non-negative finite number (received: ${targetGrams}).`,
     };
   }
 
@@ -118,10 +126,10 @@ export function convertGramsToServing(
     };
   }
 
-  if (match.gramWeight <= 0) {
+  if (!Number.isFinite(match.gramWeight) || match.gramWeight <= 0) {
     return {
       success: false,
-      error: 'UNSUPPORTED_UNIT_FOR_FOOD',
+      error: 'INVALID_CONVERSION_FACTOR',
       message: `Invalid conversion factor registered for unit "${targetUnit}".`,
     };
   }
@@ -140,7 +148,11 @@ export function convertGramsToServing(
 
 /**
  * Reference conversion profiles for representative regional foods.
- * Used for testing and initial seeding, demonstrating food-specific density variations.
+ *
+ * PROVENANCE & LICENSING COMPLIANCE:
+ * These conversions are illustrative household estimates for common culinary preparations.
+ * They are NOT certified or authoritative biochemical data from ICMR-NIN/IFCT or government sources.
+ * Provenance is marked explicitly as ESTIMATED_HOUSEHOLD.
  */
 export const REFERENCE_SERVING_PROFILES = {
   DAL_TADKA: [
@@ -148,36 +160,38 @@ export const REFERENCE_SERVING_PROFILES = {
       unit: 'katori',
       gramWeight: 200,
       volumeMl: 200,
-      provenance: ServingProvenance.ICMR_NIN_IFCT,
-      notes: 'Standard 200ml Indian katori filled with cooked yellow lentil dal.',
+      provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
+      notes:
+        'Illustrative household estimate: Standard ~200ml Indian katori filled with cooked yellow lentil dal (density ~1.0 g/ml).',
     },
     {
       unit: 'bowl',
       gramWeight: 350,
       volumeMl: 350,
       provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
-      notes: 'Standard soup/cereal bowl.',
+      notes: 'Illustrative household estimate: Standard soup/cereal bowl.',
     },
     {
       unit: 'ladle',
       gramWeight: 100,
       volumeMl: 100,
       provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
-      notes: 'One standard cooking serving ladle.',
+      notes: 'Illustrative household estimate: One standard cooking serving ladle.',
     },
   ],
   ROTI_PHULKA: [
     {
       unit: 'roti',
       gramWeight: 35,
-      provenance: ServingProvenance.ICMR_NIN_IFCT,
-      notes: 'One medium dry whole-wheat phulka (~15cm diameter).',
+      provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
+      notes:
+        'Illustrative household estimate: One medium dry whole-wheat phulka (~15cm diameter, 30-40g).',
     },
     {
       unit: 'piece',
       gramWeight: 35,
-      provenance: ServingProvenance.ICMR_NIN_IFCT,
-      notes: 'Synonym for one roti.',
+      provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
+      notes: 'Illustrative synonym for one roti.',
     },
   ],
   BHINDI_SABZI_DRY: [
@@ -185,13 +199,15 @@ export const REFERENCE_SERVING_PROFILES = {
       unit: 'katori',
       gramWeight: 140,
       volumeMl: 200,
-      provenance: ServingProvenance.ICMR_NIN_IFCT,
-      notes: 'Cooked dry okra sabzi. Lower density than liquid dal.',
+      provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
+      notes:
+        'Illustrative household estimate: Cooked dry okra sabzi. Notice lower volumetric density than liquid dal.',
     },
     {
       unit: 'tablespoon',
       gramWeight: 25,
       provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
+      notes: 'Illustrative household estimate: Level tablespoon of dry sabzi.',
     },
   ],
   LASSI_SWEET: [
@@ -200,7 +216,8 @@ export const REFERENCE_SERVING_PROFILES = {
       gramWeight: 280,
       volumeMl: 250,
       provenance: ServingProvenance.ESTIMATED_HOUSEHOLD,
-      notes: 'Sweetened yogurt drink in standard 250ml glass (density ~1.12 g/ml).',
+      notes:
+        'Illustrative household estimate: Sweetened yogurt beverage in standard 250ml glass (estimated density ~1.12 g/ml).',
     },
   ],
   WATER: [
@@ -209,7 +226,8 @@ export const REFERENCE_SERVING_PROFILES = {
       gramWeight: 250,
       volumeMl: 250,
       provenance: ServingProvenance.USDA,
-      notes: 'Pure water (density exactly 1.00 g/ml).',
+      notes:
+        'Reference measurement: Pure water in standard 250ml glass (density exactly 1.00 g/ml).',
     },
   ],
 } as const satisfies Record<string, FoodServingConversion[]>;

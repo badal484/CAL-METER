@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { aggregateNutrients } from '../src/formulas/nutrient-aggregation.js';
 import { NutrientProfile } from '../src/types/index.js';
+import { DomainValidationError } from '../src/errors/index.js';
 
 describe('Nutrient Aggregation', () => {
   it('correctly aggregates multiple food items in a meal', () => {
@@ -59,5 +60,68 @@ describe('Nutrient Aggregation', () => {
     expect(total.fatGrams).toBe(0);
     expect(total.fiberGrams).toBeUndefined();
     expect(total.micronutrients).toBeUndefined();
+  });
+
+  describe('Numeric Validation & Error Handling', () => {
+    const validProfile: NutrientProfile = {
+      calories: 100,
+      proteinGrams: 10,
+      carbsGrams: 10,
+      fatGrams: 2,
+    };
+
+    it('rejects profiles with NaN or Infinity macronutrients', () => {
+      expect(() => aggregateNutrients([{ ...validProfile, calories: NaN }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, proteinGrams: Infinity }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, carbsGrams: -Infinity }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, fatGrams: NaN }])).toThrow(
+        DomainValidationError,
+      );
+    });
+
+    it('rejects profiles with negative macronutrients', () => {
+      expect(() => aggregateNutrients([{ ...validProfile, calories: -50 }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, proteinGrams: -5 }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, carbsGrams: -10 }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, fatGrams: -2 }])).toThrow(
+        DomainValidationError,
+      );
+    });
+
+    it('rejects profiles with NaN, Infinity, or negative fiber', () => {
+      expect(() => aggregateNutrients([{ ...validProfile, fiberGrams: NaN }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, fiberGrams: -3 }])).toThrow(
+        DomainValidationError,
+      );
+      expect(() => aggregateNutrients([{ ...validProfile, fiberGrams: Infinity }])).toThrow(
+        DomainValidationError,
+      );
+    });
+
+    it('rejects profiles with NaN, Infinity, or negative micronutrient values', () => {
+      expect(() =>
+        aggregateNutrients([{ ...validProfile, micronutrients: { ironMg: NaN } }]),
+      ).toThrow(DomainValidationError);
+      expect(() =>
+        aggregateNutrients([{ ...validProfile, micronutrients: { sodiumMg: -100 } }]),
+      ).toThrow(DomainValidationError);
+      expect(() =>
+        aggregateNutrients([{ ...validProfile, micronutrients: { zincMg: Infinity } }]),
+      ).toThrow(DomainValidationError);
+    });
   });
 });

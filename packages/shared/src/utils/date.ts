@@ -1,5 +1,7 @@
+import { DomainValidationError } from '../errors/index.js';
+
 /**
- * Deterministic date and calendar utilities.
+ * Deterministic date, calendar, and age derivation utilities.
  */
 
 export function formatDateToIso(date: Date): string {
@@ -9,23 +11,46 @@ export function formatDateToIso(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Parses an ISO date string (YYYY-MM-DD) into a UTC Date object.
+ * Strictly validates that the calendar date actually exists (e.g. rejects 2026-02-30, 2026-13-01).
+ */
 export function parseIsoDate(isoDateString: string): Date {
-  const regex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!regex.test(isoDateString)) {
-    throw new Error(`Invalid ISO date format: ${isoDateString}. Expected YYYY-MM-DD.`);
+  const regex = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const match = regex.exec(isoDateString);
+  if (!match || !match[1] || !match[2] || !match[3]) {
+    throw new DomainValidationError(
+      `Invalid ISO date format: ${isoDateString}. Expected YYYY-MM-DD.`,
+    );
   }
-  const [yearStr, monthStr, dayStr] = isoDateString.split('-');
-  const year = Number(yearStr);
-  const month = Number(monthStr) - 1;
-  const day = Number(dayStr);
-  const parsed = new Date(Date.UTC(year, month, day));
+
+  const year = Number(match[1]);
+  const monthNum = Number(match[2]);
+  const dayNum = Number(match[3]);
+
+  if (monthNum < 1 || monthNum > 12) {
+    throw new DomainValidationError(
+      `Invalid calendar month: ${monthNum}. Month must be between 01 and 12.`,
+    );
+  }
+
+  if (dayNum < 1 || dayNum > 31) {
+    throw new DomainValidationError(
+      `Invalid calendar day: ${dayNum}. Day must be between 01 and 31.`,
+    );
+  }
+
+  const parsed = new Date(Date.UTC(year, monthNum - 1, dayNum));
+
+  // Verify that JavaScript Date did not roll over (e.g. Feb 30 -> March 2)
   if (
     parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month ||
-    parsed.getUTCDate() !== day
+    parsed.getUTCMonth() !== monthNum - 1 ||
+    parsed.getUTCDate() !== dayNum
   ) {
-    throw new Error(`Invalid calendar date: ${isoDateString}.`);
+    throw new DomainValidationError(`Impossible calendar date: ${isoDateString}.`);
   }
+
   return parsed;
 }
 
@@ -36,6 +61,39 @@ export function isValidIsoDate(isoDateString: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Derives age in whole completed years from Date of Birth against a UTC reference date.
+ * Does not rely on untrusted client-supplied age values.
+ */
+export function calculateAgeFromDob(dobString: string, referenceDate: Date = new Date()): number {
+  const birthDate = parseIsoDate(dobString);
+
+  const refYear = referenceDate.getUTCFullYear();
+  const refMonth = referenceDate.getUTCMonth();
+  const refDay = referenceDate.getUTCDate();
+
+  const birthYear = birthDate.getUTCFullYear();
+  const birthMonth = birthDate.getUTCMonth();
+  const birthDay = birthDate.getUTCDate();
+
+  if (birthDate.getTime() > referenceDate.getTime()) {
+    throw new DomainValidationError(`Date of birth (${dobString}) cannot be in the future.`);
+  }
+
+  let age = refYear - birthYear;
+  if (refMonth < birthMonth || (refMonth === birthMonth && refDay < birthDay)) {
+    age--;
+  }
+
+  if (age < 0 || age > 130) {
+    throw new DomainValidationError(
+      `Derived age (${age} years) is outside plausible physiological boundaries.`,
+    );
+  }
+
+  return age;
 }
 
 export function addDays(date: Date, days: number): Date {
