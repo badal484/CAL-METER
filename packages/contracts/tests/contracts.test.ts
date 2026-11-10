@@ -1299,4 +1299,77 @@ describe('Contracts Runtime Schema Validation', () => {
       expect(MealRecommendationSchema.safeParse(meal).success).toBe(true);
     });
   });
+
+  describe('AI Nutrition Coach & Personalized Insights Contracts (Part 11)', () => {
+    it('validates SendCoachMessageSchema constraints', async () => {
+      const { SendCoachMessageSchema } = await import('../src/coach.contract.js');
+
+      expect(SendCoachMessageSchema.safeParse({ message: 'How is my protein intake today?' }).success).toBe(true);
+      expect(SendCoachMessageSchema.safeParse({ message: '' }).success).toBe(false);
+      expect(SendCoachMessageSchema.safeParse({ message: '   ' }).success).toBe(false);
+      expect(SendCoachMessageSchema.safeParse({ message: 'a'.repeat(2001) }).success).toBe(false);
+    });
+
+    it('validates PersonalizedInsightSchema structure', async () => {
+      const { PersonalizedInsightSchema } = await import('../src/coach.contract.js');
+      const { InsightType, InsightCategory } = await import('@calmeter/shared');
+
+      const insight = {
+        type: InsightType.PROTEIN_PACING,
+        category: InsightCategory.RECOMMENDATION,
+        title: 'Protein Density Opportunity',
+        message: 'You have reached 45% of your protein target.',
+        actionableTip: 'Add paneer or dal to your dinner.',
+        periodAnalyzed: 'TODAY',
+        metricData: { current: 45, target: 140, unit: 'g' },
+      };
+
+      expect(PersonalizedInsightSchema.safeParse(insight).success).toBe(true);
+    });
+
+    it('validates MealRecommendationSchema with verified food items', async () => {
+      const { MealRecommendationSchema } = await import('../src/coach.contract.js');
+      const { MealType } = await import('@calmeter/shared');
+
+      const meal = {
+        id: 'rec-1',
+        mealType: MealType.DINNER,
+        title: 'High-Protein Moong Dal & Phulkas',
+        description: 'Balanced vegetarian dinner fitting your remaining calorie deficit.',
+        cuisine: 'North Indian',
+        totalCalories: 480,
+        totalProtein: 22,
+        totalCarbs: 68,
+        totalFat: 10,
+        items: [
+          {
+            foodName: 'Moong Dal Tadka',
+            portionAmount: 1,
+            servingUnit: 'katori',
+            gramWeight: 200,
+            calories: 220,
+            protein: 12,
+            carbs: 28,
+            fat: 6,
+            isVerified: true,
+          },
+          {
+            foodName: 'Whole Wheat Phulka',
+            portionAmount: 2,
+            servingUnit: 'piece',
+            gramWeight: 70,
+            calories: 160,
+            protein: 6,
+            carbs: 32,
+            fat: 1,
+            isVerified: true,
+          },
+        ],
+        fitsRemainingBudget: true,
+        dietaryTags: ['VEGETARIAN', 'HIGH_FIBER'],
+      };
+
+      expect(MealRecommendationSchema.safeParse(meal).success).toBe(true);
+    });
+  });
 });
