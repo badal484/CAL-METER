@@ -202,3 +202,4 @@ ALTER TABLE "food_import_batches"
 
 ALTER TABLE "food_ingredients"
   ADD CONSTRAINT "food_ingredients_gram_weight_check" CHECK ("gram_weight" IS NULL OR "gram_weight" > 0);
+

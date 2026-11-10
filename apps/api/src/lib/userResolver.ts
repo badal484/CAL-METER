@@ -57,3 +57,5 @@ export async function resolveUserId(
 
   return created.id;
 }
+
+export const resolveInternalUserId = resolveUserId;

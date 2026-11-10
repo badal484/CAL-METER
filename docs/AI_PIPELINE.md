@@ -41,41 +41,77 @@ Rather than hardcoding an assumption of an older model (such as Gemini 1.5 Flash
 3. **Multimodal Benchmarks on Food Images:** Evaluate against our 100-image Golden Benchmark Suite (multi-item Indian thalis, packaged goods, complex gravies).
 4. **Cost & Latency Thresholds:** Target cost < $0.002 per scan; target provider inference latency < 1.5 seconds.
 
-### Provider Abstraction (`IVisionProvider`)
+### Provider Abstraction (`IFoodVisionProvider`)
 
-All AI interactions implement a unified interface to ensure zero vendor lock-in:
+All AI vision interactions implement a unified interface in `apps/api/src/ai/types.ts` to ensure zero vendor lock-in:
 
 ```typescript
-export interface FoodDetectionResult {
-  detectedItems: DetectedFoodItem[];
-  sceneContext: {
-    plateType?: 'STAINLESS_THALI' | 'CERAMIC_PLATE' | 'BOWL' | 'TAKEAWAY_CONTAINER';
-    overallConfidence: number;
-    ambientLighting: 'GOOD' | 'POOR' | 'GLARE';
-  };
-  rawLatencyMs: number;
+export interface IFoodVisionProvider {
+  name: string;
+  recognizeFood(request: FoodRecognitionRequest): Promise<FoodRecognitionResponse>;
 }
 
-export interface DetectedFoodItem {
+export interface FoodRecognitionRequest {
+  imageBuffer: Buffer;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  options?: {
+    maxItems?: number;
+    preferredCuisine?: string;
+    includeVisualIndicators?: boolean;
+    timeoutMs?: number;
+  };
+}
+
+export interface RecognizedFoodItem {
+  id: string;
   canonicalName: string;
   regionalName?: string;
-  cuisine: string;
-  cookingMethod:
-    'BOILED' | 'STEAMED' | 'SAUTEED' | 'DEEP_FRIED' | 'RAW' | 'CURRIED_RICH' | 'CURRIED_LIGHT';
+  cuisine?: string;
+  cookingMethod?:
+    | 'BOILED'
+    | 'STEAMED'
+    | 'SAUTEED'
+    | 'DEEP_FRIED'
+    | 'RAW'
+    | 'CURRIED_RICH'
+    | 'CURRIED_LIGHT'
+    | 'ROASTED'
+    | 'BAKED'
+    | 'OTHER';
   portion: {
     quantity: number;
-    unit: 'katori' | 'piece' | 'roti' | 'cup' | 'tablespoon' | 'gram' | 'bowl';
+    unit:
+      'katori' | 'piece' | 'roti' | 'cup' | 'tablespoon' | 'gram' | 'bowl' | 'plate' | 'portion';
     estimatedWeightGrams: number;
+    confidence: number;
+    alternatives?: Array<{
+      quantity: number;
+      unit: string;
+      estimatedWeightGrams: number;
+    }>;
   };
-  confidence: number; // 0.0 to 1.0
-  visualIndicators: {
-    oilSheen: 'DRY' | 'MODERATE' | 'HEAVY';
+  confidence: number;
+  visualIndicators?: {
+    oilSheen?: 'DRY' | 'MODERATE' | 'HEAVY';
     apparentSizeCm?: number;
   };
 }
 
-export interface IVisionProvider {
-  analyzeFoodImage(imageBuffer: Buffer, mimeType: string): Promise<FoodDetectionResult>;
+export interface FoodRecognitionResponse {
+  detectedItems: RecognizedFoodItem[];
+  sceneContext: {
+    plateType?: 'STAINLESS_THALI' | 'CERAMIC_PLATE' | 'BOWL' | 'TAKEAWAY_CONTAINER' | 'UNKNOWN';
+    overallConfidence: number;
+    ambientLighting?: 'GOOD' | 'POOR' | 'GLARE';
+  };
+  rawLatencyMs: number;
+  provider: string;
+  model: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 ```
 
@@ -152,14 +188,76 @@ flowchart TD
 
 ### 5.1. Integration with Food Database Foundation
 
-1. **Multi-Field Matching:** Searches both canonical `name`, `local_names` string array, and dedicated `food_aliases` (e.g. mapping detected _"phulka"_ to _"Whole Wheat Roti / Phulka"_).
-2. **Serving Unit Resolution:** Uses `ServingUnitConversion` with food-specific density (e.g. _katori_ for Dal Tadka = 200g, whereas _katori_ for dry Bhindi Masala = 140g).
-3. **Nutrient Multiplication via Shared Formulas:** Employs `@calmeter/shared` `calculatePortionNutrients()` to perform deterministic scaling with rounding overflow guards and NaN/Infinity rejections.
-4. **Preservation of Nulls:** Unmeasured micronutrients in `food_nutrient_profiles` remain `null` rather than falsely asserting zero.
+1. **Multi-Field Matching:** Searches canonical `name`, `local_names` array, and dedicated `food_aliases` (e.g. mapping detected _"phulka"_ to _"Whole Wheat Roti / Phulka"_).
+2. **Multi-Tenant Scoping:** Strictly scopes custom food lookups to the authenticated user (`createdByUserId = userId`). Private custom foods from other users are completely invisible.
+3. **Serving Unit Resolution:** Uses `ServingUnitConversion` with food-specific density (e.g. _katori_ for Dal Tadka = 200g, whereas _katori_ for dry Bhindi Masala = 140g).
+4. **Deterministic Nutrient Calculation:** Employs `@calmeter/shared` `scaleNutrients` and `convertServingToGrams` with rounding overflow guards and NaN/Infinity rejections.
+5. **Preservation of Nulls:** Unmeasured micronutrients in `food_nutrient_profiles` remain `null` rather than falsely asserting zero.
 
 ---
 
-## 6. Performance, Latency, and Cost Targets
+## 6. Scan Lifecycle & State Machine
+
+Every food photograph flows through a strict state machine persisted in PostgreSQL `food_scan_logs`:
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED: POST /scans (Quota Check Passed)
+    CREATED --> UPLOADED: POST /scans/:id/upload (Validated & Stripped)
+    UPLOADED --> QUEUED: Enqueued in BullMQ
+    QUEUED --> PROCESSING: Worker Picks Up Job
+    PROCESSING --> NEEDS_REVIEW: AI Detection & Matching Successful
+    PROCESSING --> FAILED: Provider Failure or Malformed Image
+    NEEDS_REVIEW --> NEEDS_REVIEW: PATCH /scans/:id/corrections (Recalculate)
+    NEEDS_REVIEW --> COMPLETED: POST /scans/:id/confirm (Idempotent Diary Log)
+    NEEDS_REVIEW --> CANCELLED: POST /scans/:id/cancel
+    FAILED --> [*]
+    CANCELLED --> [*]
+    COMPLETED --> [*]
+```
+
+### State Definitions:
+
+- `CREATED`: Scan metadata generated; presigned upload URL or upload session initialized.
+- `UPLOADED`: Image received, magic bytes verified, EXIF stripped, stored in safe tenant path `scans/{userId}/{scanId}.jpg`.
+- `QUEUED`: Analysis job placed into Redis-backed BullMQ queue.
+- `PROCESSING`: Multimodal vision provider analyzing pixels; matching service querying database.
+- `NEEDS_REVIEW`: Food items recognized, matched to catalog, and deterministic nutrients computed. Awaiting user review/adjustment.
+- `COMPLETED`: User confirmed meal; items appended to diary `meal_food_items`.
+- `FAILED`: Unrecoverable error during vision analysis or database matching.
+- `CANCELLED`: User discarded scan before confirming.
+
+---
+
+## 7. Image Ingestion Security & Validation
+
+All uploaded images pass through server-side gatekeepers before being processed:
+
+1. **Magic Bytes Validation:** Inspects raw file header bytes:
+   - JPEG: `0xFF, 0xD8, 0xFF`
+   - PNG: `0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A`
+   - WebP: `RIFF....WEBP`
+2. **Dimension Constraints:** Validates actual pixel dimensions from headers. Must be within **100x100** to **8192x8192** pixels. Rejects micro-payloads and decompression bombs.
+3. **EXIF Metadata Stripping:** Automatically removes GPS coordinates, camera serial numbers, and device timestamps before saving to disk or object storage.
+4. **File Size Bounds:** Maximum allowed image size is **10 MB** (minimum 100 bytes).
+
+---
+
+## 8. Error Taxonomy & Resilient Fallbacks
+
+AI provider exceptions are mapped to normalized application errors:
+
+| Internal Provider Error      | Cause                                             | User-Facing Behavior                                         |
+| :--------------------------- | :------------------------------------------------ | :----------------------------------------------------------- |
+| `ProviderTimeoutError`       | Gemini API latency exceeded timeout (default 15s) | Returns retryable failure; suggests manual food search.      |
+| `ProviderRateLimitError`     | Upstream 429 quota exhaustion                     | Automatic exponential backoff retry in worker queue.         |
+| `ProviderUnavailableError`   | Upstream 500/503 service outage                   | Graceful degradation; prompts user to log meal manually.     |
+| `MalformedModelOutputError`  | Response failed JSON Schema validation            | Logged with raw telemetry; returns fallback empty detection. |
+| `DailyScanLimitReachedError` | Free tier limit exceeded (> 3 scans/day)          | HTTP 429 `DAILY_SCAN_LIMIT_REACHED` with upgrade CTA.        |
+
+---
+
+## 9. Performance, Latency, and Cost Targets
 
 _Note: Latency and throughput figures represent unverified engineering design targets until benchmarked in production._
 

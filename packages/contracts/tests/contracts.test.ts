@@ -624,4 +624,169 @@ describe('Contracts Runtime Schema Validation', () => {
       });
     });
   });
+
+  describe('Food Database & Nutrition Contracts', () => {
+    describe('FoodNutrientProfileSchema', () => {
+      const validProfile = {
+        calories: 184,
+        protein: 9.2,
+        carbs: 24.5,
+        fat: 5.6,
+        saturatedFat: 1.2,
+        transFat: 0,
+        fiber: 5.2,
+        sugar: 1.5,
+        addedSugar: 0,
+        sodium: 320,
+        cholesterol: 0,
+        potassium: 280,
+        calcium: 45,
+        iron: 2.1,
+        vitaminD: null,
+        vitaminB12: null,
+        micronutrients: { zinc: 1.1, magnesium: 35 },
+      };
+
+      it('validates a complete nutrient profile per 100g', () => {
+        const parsed = FoodNutrientProfileSchema.safeParse(validProfile);
+        expect(parsed.success).toBe(true);
+      });
+
+      it('strictly distinguishes explicit zero from unknown (null / undefined)', () => {
+        const profileWithExplicitZerosAndNulls = {
+          calories: 120,
+          protein: 5,
+          carbs: 20,
+          fat: 2,
+          saturatedFat: 0, // Explicit zero
+          transFat: null, // Explicitly unknown
+          sugar: 0, // Explicit zero
+          addedSugar: null, // Unknown
+          sodium: null, // Unknown
+        };
+
+        const result = FoodNutrientProfileSchema.safeParse(profileWithExplicitZerosAndNulls);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.saturatedFat).toBe(0);
+          expect(result.data.transFat).toBeNull();
+          expect(result.data.sugar).toBe(0);
+          expect(result.data.addedSugar).toBeNull();
+          expect(result.data.sodium).toBeNull();
+        }
+      });
+
+      it('rejects negative nutrient values', () => {
+        expect(
+          FoodNutrientProfileSchema.safeParse({ ...validProfile, calories: -10 }).success,
+        ).toBe(false);
+        expect(
+          FoodNutrientProfileSchema.safeParse({ ...validProfile, protein: -0.5 }).success,
+        ).toBe(false);
+        expect(
+          FoodNutrientProfileSchema.safeParse({ ...validProfile, saturatedFat: -1 }).success,
+        ).toBe(false);
+        expect(FoodNutrientProfileSchema.safeParse({ ...validProfile, sodium: -50 }).success).toBe(
+          false,
+        );
+      });
+
+      it('rejects non-finite nutrient values (NaN, Infinity)', () => {
+        expect(
+          FoodNutrientProfileSchema.safeParse({ ...validProfile, calories: NaN }).success,
+        ).toBe(false);
+        expect(
+          FoodNutrientProfileSchema.safeParse({ ...validProfile, carbs: Infinity }).success,
+        ).toBe(false);
+        expect(
+          FoodNutrientProfileSchema.safeParse({ ...validProfile, calcium: -Infinity }).success,
+        ).toBe(false);
+      });
+    });
+
+    describe('CreateCustomFoodSchema & UpdateCustomFoodSchema', () => {
+      const validCustomFood = {
+        name: 'Maa ki Dal (Mom style)',
+        localNames: ['Dal Makhani Homestyle'],
+        brand: 'Homemade',
+        cuisine: 'INDIAN_NORTH',
+        servingSize: 180,
+        servingUnit: 'katori',
+        calories: 210,
+        protein: 8.5,
+        carbs: 26,
+        fat: 7.8,
+        fiber: 6.2,
+        sodium: 380,
+      };
+
+      it('validates custom food creation payload', () => {
+        const parsed = CreateCustomFoodSchema.safeParse(validCustomFood);
+        expect(parsed.success).toBe(true);
+      });
+
+      it('rejects custom food without a name', () => {
+        expect(CreateCustomFoodSchema.safeParse({ ...validCustomFood, name: '' }).success).toBe(
+          false,
+        );
+      });
+
+      it('rejects negative calories or macros on custom food creation', () => {
+        expect(
+          CreateCustomFoodSchema.safeParse({ ...validCustomFood, calories: -100 }).success,
+        ).toBe(false);
+        expect(CreateCustomFoodSchema.safeParse({ ...validCustomFood, protein: -5 }).success).toBe(
+          false,
+        );
+        expect(CreateCustomFoodSchema.safeParse({ ...validCustomFood, fat: -1 }).success).toBe(
+          false,
+        );
+      });
+
+      it('allows partial updates with UpdateCustomFoodSchema', () => {
+        const partialUpdate = {
+          name: 'Updated Mom style Dal',
+          calories: 195,
+        };
+        const parsed = UpdateCustomFoodSchema.safeParse(partialUpdate);
+        expect(parsed.success).toBe(true);
+      });
+    });
+
+    describe('FoodSearchQuerySchema', () => {
+      it('validates a standard search query with defaults', () => {
+        const parsed = FoodSearchQuerySchema.safeParse({ q: 'roti' });
+        expect(parsed.success).toBe(true);
+        if (parsed.success) {
+          expect(parsed.data.q).toBe('roti');
+          expect(parsed.data.page).toBe(1);
+          expect(parsed.data.limit).toBe(20);
+          expect(parsed.data.sortBy).toBe('relevance');
+          expect(parsed.data.sortOrder).toBe('asc');
+        }
+      });
+
+      it('coerces string page and limit parameters safely', () => {
+        const parsed = FoodSearchQuerySchema.safeParse({
+          q: 'paneer',
+          page: '2',
+          limit: '50',
+          sortBy: 'protein',
+          sortOrder: 'desc',
+        });
+        expect(parsed.success).toBe(true);
+        if (parsed.success) {
+          expect(parsed.data.page).toBe(2);
+          expect(parsed.data.limit).toBe(50);
+          expect(parsed.data.sortBy).toBe('protein');
+          expect(parsed.data.sortOrder).toBe('desc');
+        }
+      });
+
+      it('rejects limit exceeding 100 to prevent unbounded queries', () => {
+        const parsed = FoodSearchQuerySchema.safeParse({ q: 'dal', limit: '500' });
+        expect(parsed.success).toBe(false);
+      });
+    });
+  });
 });

@@ -56,10 +56,15 @@ export enum LoggedMethod {
 }
 
 export enum ScanStatus {
-  PENDING = 'PENDING',
+  CREATED = 'CREATED',
+  UPLOADED = 'UPLOADED',
+  QUEUED = 'QUEUED',
   PROCESSING = 'PROCESSING',
+  NEEDS_REVIEW = 'NEEDS_REVIEW',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  PENDING = 'PENDING',
 }
 
 export enum FoodSource {

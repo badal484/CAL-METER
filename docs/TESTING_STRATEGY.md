@@ -70,6 +70,12 @@ describe('Nutrition Math Engine', () => {
     - `foodSearch.test.ts`: Text search query parsing, Indian regional alias ranking priority (_phulka_ -> _roti_), barcode lookups, cuisine filtering, pagination, sort orders.
     - `foodCustom.test.ts`: Custom food creation, multi-tenant isolation (User A vs. User B), anti-enumeration 404 security checks, update constraints, soft deletion preservation.
     - `foodDatabase.test.ts`: PostgreSQL real CHECK constraints enforcement (`calories >= 0`, `confidence_score` [0, 1]), null vs. 0 nutrient preservation, shared nutrient aggregation formula verification, idempotency.
+  - **AI Food Recognition & Estimation Pipeline (`apps/api/tests/`):**
+    - `aiImageHandling.test.ts`: Magic bytes detection (JPEG, PNG, WebP), dimension bounds (100x100 to 8192x8192), EXIF metadata stripping (APP1 markers and PNG text chunks), size limits.
+    - `aiRecognition.test.ts`: Provider abstraction, single food, multi-plate, Indian thali (8 components), empty scene / low confidence handling, upstream error taxonomy (timeout, rate limit, outage, malformed JSON).
+    - `aiFoodMatching.test.ts`: Exact canonical match, Indian alias matching (_phulka_ -> Whole Wheat Roti), ambiguous match ranking, multi-tenant custom food isolation (User A custom food never matched for User B).
+    - `aiNutritionCalculation.test.ts`: Deterministic calculation per 100g via `@calmeter/shared` formulas, serving unit conversion (piece, katori, cup), strict preservation of `null` vs `0` micronutrients, whole-meal nutrient aggregation, portion adjustment recalculations.
+    - `aiScanWorkflow.test.ts`: End-to-end scan lifecycle REST API tests (`POST /scans`, image upload, process, corrections, diary confirmation, cancellation), daily quota gate (3 scans/day -> 429), multi-tenant 404 security barriers, idempotent diary confirmation.
 
 ### 2.3. End-to-End (E2E) Testing (Maestro & Detox)
 

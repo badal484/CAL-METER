@@ -186,16 +186,17 @@ Manual override of daily targets by user.
 
 ### Module 3: Food Scans & Vision Engine (`/scans`)
 
-#### `POST /scans/presign-upload`
+#### `POST /scans`
 
-Generates a short-lived presigned S3 PUT URL for direct image uploading. Checks daily scan quota prior to issuance.
+Initializes a new food scan record and validates the daily scan quota (free users capped at 3 scans/day).
 
-- **Request Body:**
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body (optional):**
 
 ```json
 {
-  "contentType": "image/jpeg",
-  "fileSizeBytes": 204850
+  "mealType": "LUNCH",
+  "notes": "Office canteen lunch"
 }
 ```
 
@@ -206,36 +207,190 @@ Generates a short-lived presigned S3 PUT URL for direct image uploading. Checks 
   "success": true,
   "data": {
     "scanId": "8f3b6c20-639a-4c91-a1b4-abcdef012345",
-    "uploadUrl": "https://storage.calmeter.app/scans/8f3b6c20...?X-Amz-Signature=...",
-    "storageKey": "scans/2026/11/10/8f3b6c20.jpg",
-    "expiresInSeconds": 300
+    "status": "CREATED",
+    "createdAt": "2026-11-10T12:00:00.000Z"
   }
 }
 ```
 
-#### `POST /scans/:id/analyze`
+- **Error `429 Too Many Requests`:**
 
-Dispatches the uploaded image to the BullMQ background queue for Gemini multimodal processing.
+```json
+{
+  "success": false,
+  "error": {
+    "code": "DAILY_SCAN_LIMIT_REACHED",
+    "message": "Daily scan limit reached. You have used 3 of 3 scans today. Upgrade to CAL METER Pro for unlimited scans."
+  }
+}
+```
 
-- **Path Parameter:** `id` (UUID from presign step)
-- **Response `202 Accepted`:**
+#### `POST /scans/:id/upload-url`
+
+Generates a secure, short-lived presigned upload URL or storage token for direct S3-compatible image upload.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+
+```json
+{
+  "contentType": "image/jpeg",
+  "fileSizeBytes": 204850
+}
+```
+
+- **Response `200 OK`:**
 
 ```json
 {
   "success": true,
   "data": {
     "scanId": "8f3b6c20-639a-4c91-a1b4-abcdef012345",
-    "status": "PROCESSING",
-    "estimatedLatencyMs": 2000
+    "uploadUrl": "https://storage.calmeter.app/scans/8f3b6c20...?token=...",
+    "storageKey": "scans/user-uuid/8f3b6c20.jpg",
+    "expiresInSeconds": 300
+  }
+}
+```
+
+#### `POST /scans/:id/upload`
+
+Uploads the image file directly to the backend. Validates magic bytes (JPEG/PNG/WebP), strips all EXIF metadata, enforces dimension constraints (100x100 to 8192x8192), stores the image in tenant-isolated storage, and transitions the scan status to `UPLOADED`.
+
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: image/jpeg` (or `multipart/form-data`)
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "scanId": "8f3b6c20-639a-4c91-a1b4-abcdef012345",
+    "status": "UPLOADED",
+    "imageWidth": 1024,
+    "imageHeight": 1024,
+    "fileSizeBytes": 184320,
+    "mimeType": "image/jpeg"
+  }
+}
+```
+
+#### `POST /scans/upload`
+
+Convenience combined endpoint: creates a scan record and uploads the image in a single HTTP transaction. Enforces daily quotas and performs all image sanitization steps.
+
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: image/jpeg`
+- **Response `201 Created`:** Returns scan metadata with status `UPLOADED`.
+
+#### `POST /scans/:id/process`
+
+Executes the AI multimodal recognition pipeline, matches identified candidates against the verified database, and deterministically computes nutrition using `@calmeter/shared` formulas. Transitions scan status to `NEEDS_REVIEW`.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body (optional):**
+
+```json
+{
+  "async": false
+}
+```
+
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "scanId": "8f3b6c20-639a-4c91-a1b4-abcdef012345",
+    "status": "NEEDS_REVIEW",
+    "items": [
+      {
+        "id": "item-1",
+        "name": "Dal Tadka",
+        "confidence": 0.94,
+        "portion": {
+          "amount": 1,
+          "unit": "katori",
+          "grams": 200,
+          "confidence": 0.92
+        },
+        "selectedMatch": {
+          "foodItemId": "7f8b9c0d-1234-4567-89ab-cdef01234567",
+          "name": "Yellow Dal Tadka (Home-style)",
+          "source": "REFERENCE_INDIAN"
+        },
+        "matchOptions": [
+          {
+            "foodItemId": "7f8b9c0d-1234-4567-89ab-cdef01234567",
+            "name": "Yellow Dal Tadka (Home-style)",
+            "score": 0.96,
+            "source": "REFERENCE_INDIAN"
+          }
+        ],
+        "nutrients": {
+          "calories": 184.0,
+          "protein": 9.2,
+          "carbs": 24.5,
+          "fat": 5.6,
+          "fiber": 4.2
+        }
+      }
+    ],
+    "totalNutrients": {
+      "calories": 344.0,
+      "protein": 14.6,
+      "carbs": 56.5,
+      "fat": 6.4,
+      "fiber": 8.4
+    }
   }
 }
 ```
 
 #### `GET /scans/:id`
 
-Polls analysis status or fetches final detected food items with matched nutritional data.
+Retrieves the complete state, detected items, match options, and calculated nutrients of a scan.
 
-- **Response `200 OK` (when status = "COMPLETED"):**
+- **Headers:** `Authorization: Bearer <token>`
+- **Response `200 OK`:** Returns full `ScanDetailResponse`.
+
+#### `PATCH /scans/:id/corrections`
+
+Applies user adjustments to portions, replaces matched food candidates, or removes/adds items on the review sheet. Recomputes all totals deterministically using `@calmeter/shared` formulas.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+
+```json
+{
+  "items": [
+    {
+      "itemId": "item-1",
+      "portionAmount": 1.5,
+      "portionUnit": "katori",
+      "gramWeight": 300,
+      "selectedFoodItemId": "7f8b9c0d-1234-4567-89ab-cdef01234567"
+    }
+  ]
+}
+```
+
+- **Response `200 OK`:** Returns updated scan detail with recomputed nutrients.
+
+#### `POST /scans/:id/confirm`
+
+Commits the reviewed food scan into the user's permanent daily diary. Appends items to `meal_food_items` linked to the user's meal entry slot. Operation is idempotent: calling multiple times returns the existing diary meal entry without duplicating items.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body (optional):**
+
+```json
+{
+  "mealType": "LUNCH",
+  "date": "2026-11-10"
+}
+```
+
+- **Response `200 OK`:**
 
 ```json
 {
@@ -243,44 +398,25 @@ Polls analysis status or fetches final detected food items with matched nutritio
   "data": {
     "scanId": "8f3b6c20-639a-4c91-a1b4-abcdef012345",
     "status": "COMPLETED",
-    "latencyMs": 1840,
-    "detectedItems": [
-      {
-        "id": "det-1",
-        "name": "Dal Tadka",
-        "confidence": 0.94,
-        "portionAmount": 1.0,
-        "servingUnit": "katori",
-        "gramWeight": 200,
-        "matchedFood": {
-          "id": "fd-indian-0042",
-          "name": "Yellow Dal Tadka (Home-style)",
-          "source": "INDIAN_FCT_NIN",
-          "calories": 184.0,
-          "protein": 9.2,
-          "carbs": 24.5,
-          "fat": 5.6
-        }
-      },
-      {
-        "id": "det-2",
-        "name": "Phulka Roti",
-        "confidence": 0.98,
-        "portionAmount": 2.0,
-        "servingUnit": "piece",
-        "gramWeight": 70,
-        "matchedFood": {
-          "id": "fd-indian-0010",
-          "name": "Whole Wheat Roti (Without Ghee)",
-          "source": "INDIAN_FCT_NIN",
-          "calories": 160.0,
-          "protein": 5.4,
-          "carbs": 32.0,
-          "fat": 0.8
-        }
-      }
-    ],
-    "totalEstimatedCalories": 344.0
+    "mealEntryId": "5e1a2b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+    "confirmedAt": "2026-11-10T12:05:00.000Z"
+  }
+}
+```
+
+#### `POST /scans/:id/cancel`
+
+Discards an unconfirmed scan and transitions the status to `CANCELLED`.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "scanId": "8f3b6c20-639a-4c91-a1b4-abcdef012345",
+    "status": "CANCELLED"
   }
 }
 ```

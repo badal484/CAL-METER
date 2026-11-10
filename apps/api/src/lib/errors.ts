@@ -51,6 +51,12 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class DailyScanLimitReachedError extends AppError {
+  constructor(message = 'Daily free AI food scan limit reached (maximum 3 scans per day).') {
+    super(message, 429, 'DAILY_SCAN_LIMIT_REACHED');
+  }
+}
+
 export class PayloadTooLargeError extends AppError {
   constructor(message = 'Request payload exceeds the permissible limit.') {
     super(message, 413, 'PAYLOAD_TOO_LARGE');

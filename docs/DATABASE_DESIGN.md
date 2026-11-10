@@ -320,10 +320,15 @@ enum LoggedMethod {
 }
 
 enum ScanStatus {
-  PENDING
+  CREATED
+  UPLOADED
+  QUEUED
   PROCESSING
+  NEEDS_REVIEW
   COMPLETED
   FAILED
+  CANCELLED
+  PENDING
 }
 
 enum SubscriptionStatus {
@@ -609,6 +614,7 @@ model MealEntry {
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items         MealFoodItem[]
+  scans         FoodScanLog[]
 
   @@unique([userId, date, mealType])
   @@index([userId, date])
@@ -640,20 +646,40 @@ model MealFoodItem {
 }
 
 model FoodScanLog {
-  id             String     @id @default(uuid()) @db.Uuid
-  userId         String     @map("user_id") @db.Uuid
-  storageKey     String     @map("storage_key") @db.VarChar(500)
-  rawAiResponse  Json       @map("raw_ai_response")
-  detectedItems  Json       @map("detected_items")
-  matchedFoodIds Json       @default("[]") @map("matched_food_ids")
-  userEdited     Boolean    @default(false) @map("user_edited")
-  latencyMs      Int        @map("latency_ms")
-  status         ScanStatus @default(PENDING)
-  createdAt      DateTime   @default(now()) @map("created_at")
+  id               String      @id @default(uuid()) @db.Uuid
+  userId           String      @map("user_id") @db.Uuid
+  storageKey       String?     @map("storage_key") @db.VarChar(500)
+  mimeType         String?     @map("mime_type") @db.VarChar(50)
+  fileSizeBytes    Int?        @map("file_size_bytes")
+  imageWidth       Int?        @map("image_width")
+  imageHeight      Int?        @map("image_height")
+  provider         String?     @db.VarChar(50)
+  model            String?     @db.VarChar(100)
+  promptTokens     Int?        @map("prompt_tokens")
+  completionTokens Int?        @map("completion_tokens")
+  rawAiResponse    Json?       @map("raw_ai_response")
+  detectedItems    Json?       @map("detected_items")
+  matchedFoodIds   Json        @default("[]") @map("matched_food_ids")
+  userCorrections  Json?       @map("user_corrections")
+  nutritionResult  Json?       @map("nutrition_result")
+  errorMessage     String?     @map("error_message") @db.Text
+  failureReason    String?     @map("failure_reason") @db.VarChar(100)
+  mealEntryId      String?     @map("meal_entry_id") @db.Uuid
+  mealType         MealType?   @map("meal_type")
+  userEdited       Boolean     @default(false) @map("user_edited")
+  latencyMs        Int?        @map("latency_ms")
+  status           ScanStatus  @default(PENDING)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  uploadedAt       DateTime?   @map("uploaded_at")
+  processedAt      DateTime?   @map("processed_at")
+  confirmedAt      DateTime?   @map("confirmed_at")
+  cancelledAt      DateTime?   @map("cancelled_at")
 
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealEntry        MealEntry?  @relation(fields: [mealEntryId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([mealEntryId])
   @@map("food_scan_logs")
 }
 

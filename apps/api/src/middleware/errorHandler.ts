@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { DomainValidationError } from '@calmeter/shared';
 import { AppError, NotFoundError, type ErrorDetail } from '../lib/errors.js';
 import { formatZodIssues } from './validate.js';
 import { getConfig } from '../config/env.js';
@@ -21,6 +22,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     code = err.code;
     message = err.message;
     details = err.details;
+  } else if (err instanceof DomainValidationError) {
+    statusCode = 400;
+    code = 'VALIDATION_ERROR';
+    message = err.message;
   } else if (err instanceof ZodError) {
     statusCode = 400;
     code = 'VALIDATION_ERROR';

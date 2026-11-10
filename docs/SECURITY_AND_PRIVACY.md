@@ -127,16 +127,29 @@ graph TD
 
 ## 4. Storage Security & Image Privacy
 
-### 4.1. Direct-to-Storage Isolation
+### 4.1. Direct-to-Storage Isolation & Presigned Uploads
 
-- Mobile clients upload images directly to private S3-compatible buckets (Cloudflare R2 or AWS S3) via presigned URLs.
-- Presigned URLs are cryptographically signed with:
-  - Maximum expiration: **300 seconds (5 minutes)**.
-  - Strict Content-Type lock: `image/jpeg`.
-  - Content-Length boundary: Maximum **10 MB** (client-compressed to ~200 KB).
-- Public bucket access is completely disabled. Images are accessed by the background worker using private AWS IAM / S3 SDK credentials.
+- Mobile clients request presigned upload URLs (`POST /scans/:id/upload-url`) or upload directly through authenticated upload gateways.
+- Presigned upload tokens and URLs are strictly scoped to the tenant:
+  - Cryptographically signed with a **300-second (5 minute)** expiration.
+  - Storage paths are strictly generated server-side: `scans/{userId}/{scanId}.jpg` to eliminate directory traversal risks.
+  - File size strictly bounded to maximum **10 MB** (minimum 100 bytes).
+- Public bucket access is completely disabled. Uploads and downloads are managed via private S3/local object storage services.
 
-### 4.2. Automated Retention & Scrubbing
+### 4.2. Image Sanitization & Anti-Exploit Pipeline
+
+All image payloads pass through deterministic byte validation before persistence:
+
+1. **Magic Bytes Verification:** Inspects binary headers (`FF D8 FF` for JPEG, `89 50 4E 47 0D 0A 1A 0A` for PNG, `RIFF...WEBP` for WebP). Mismatched extensions or disguises are rejected immediately.
+2. **Decompression Bomb Protection:** Validates image dimensions directly from binary markers without loading raw bitmap into memory. Dimensions must fall between **100x100** and **8192x8192** pixels.
+3. **EXIF Metadata Stripping:** Automatically removes all EXIF segments (e.g. JPEG APP1 markers, PNG ancillary text chunks) before persisting to storage. This guarantees geolocation coordinates, camera serial numbers, and personal device timestamps are never stored or shared with upstream AI providers.
+
+### 4.3. Quota Gates & Anti-Abuse Defenses
+
+- **Free-Tier Daily Scan Limit:** Enforced at the service and route layer (`POST /scans`, `POST /scans/upload`). Free users are restricted to **3 scans per 24-hour UTC day**. Exceeding requests are rejected with HTTP 429 `DAILY_SCAN_LIMIT_REACHED`.
+- **Multi-Tenant Scan Scoping:** Every scan lookup, update, confirmation, or cancellation enforces `WHERE id = scanId AND user_id = internalUserId`. Cross-tenant probes return HTTP 404 to prevent enumeration.
+
+### 4.4. Automated Retention & Scrubbing
 
 - **Raw Image Purge:** Scan photos are temporary artifacts for AI inference. The background worker schedules deletion of unconfirmed or transient image files after **30 days**.
 - If a user opts into the "Photo Food Diary" feature, images are retained in encrypted cold storage and linked to the verified meal record.
