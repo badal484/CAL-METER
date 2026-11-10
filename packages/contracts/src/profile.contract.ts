@@ -153,6 +153,14 @@ export const UserProfileResponseSchema = z.object({
   data: UserProfileDtoSchema,
 });
 
+export const DeleteAccountResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    message: z.string(),
+    scheduledPurgeAt: z.string(),
+  }),
+});
+
 export type BodyMeasurements = z.infer<typeof BodyMeasurementsSchema>;
 export type OnboardingData = z.infer<typeof OnboardingDataSchema>;
 export type UserProfileDto = z.infer<typeof UserProfileDtoSchema>;
@@ -160,3 +168,4 @@ export type UpdateUserProfile = z.infer<typeof UpdateUserProfileSchema>;
 export type NutritionCalculationsDto = z.infer<typeof NutritionCalculationsDtoSchema>;
 export type OnboardingCompleteResponse = z.infer<typeof OnboardingCompleteResponseSchema>;
 export type UserProfileResponse = z.infer<typeof UserProfileResponseSchema>;
+export type DeleteAccountResponse = z.infer<typeof DeleteAccountResponseSchema>;

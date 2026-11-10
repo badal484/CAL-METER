@@ -32,10 +32,21 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.calmeter.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>calmeter</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>CAL METER uses your camera to scan food barcodes and packaged nutrition labels.</string>
+	<string>CAL METER uses your camera to scan food barcodes, packaged nutrition labels, and meals for AI recognition.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CAL METER needs photo library access to select food photos for meal logging and nutrition recognition.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

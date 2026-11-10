@@ -437,5 +437,44 @@ describe('User Onboarding, Nutrition Goals & Personalization API', () => {
       expect(resGoal.status).toBe(200);
       expect(resGoal.body.data).toBeNull();
     });
+
+    it('requires authentication to initiate account deletion', async () => {
+      const res = await request(app).delete('/api/v1/profile');
+      expect(res.status).toBe(401);
+    });
+
+    it('successfully initiates account deletion (App Store 5.1.1(v) & GDPR/DPDP)', async () => {
+      // Seed a device token for User A
+      await prisma.deviceToken.create({
+        data: {
+          userId: userAId,
+          token: 'token-to-be-purged-user-a',
+          platform: 'IOS',
+        },
+      });
+
+      const res = await request(app)
+        .delete('/api/v1/profile')
+        .set('Authorization', `Bearer ${TOKEN_USER_A}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.message).toContain('Account deletion initiated successfully');
+      expect(res.body.data.scheduledPurgeAt).toBeDefined();
+
+      // Verify User record is suspended and soft-deleted
+      const user = await prisma.user.findUnique({ where: { id: userAId } });
+      expect(user?.isSuspended).toBe(true);
+      expect(user?.deletedAt).not.toBeNull();
+
+      // Verify DeletionRequest was created
+      const deletionReq = await prisma.deletionRequest.findUnique({ where: { userId: userAId } });
+      expect(deletionReq).not.toBeNull();
+      expect(deletionReq?.isProcessed).toBe(false);
+
+      // Verify device tokens were purged
+      const deviceTokens = await prisma.deviceToken.findMany({ where: { userId: userAId } });
+      expect(deviceTokens.length).toBe(0);
+    });
   });
 });

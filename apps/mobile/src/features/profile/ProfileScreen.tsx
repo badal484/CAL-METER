@@ -14,6 +14,7 @@ import {
   Sparkles,
   X,
   Bell,
+  Trash2,
 } from 'lucide-react-native';
 import { ProfileApiClient } from '../../services/profileApi';
 import { GoalApiClient } from '../../services/goalApi';
@@ -220,6 +221,40 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     } finally {
       setRecalculating(false);
     }
+  };
+
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your CAL METER account? All your nutrition logs, custom foods, weight entries, and preferences will be permanently erased. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Permanently',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAccount(true);
+            try {
+              await profileClient.deleteAccount();
+              Alert.alert(
+                'Account Deletion Initiated',
+                'Your account has been scheduled for deletion. You will now be logged out.',
+                [{ text: 'OK' }],
+              );
+            } catch (err: any) {
+              Alert.alert(
+                'Deletion Failed',
+                err.message || 'Unable to delete account at this time.',
+              );
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (showOnboarding) {
@@ -581,6 +616,37 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </View>
           <ChevronRight size={18} color={colors.textTertiary} />
         </Card>
+
+        {/* ACCOUNT DELETION (Apple App Store Guideline 5.1.1(v) & GDPR/DPDP) */}
+        <Pressable
+          onPress={handleDeleteAccount}
+          disabled={deletingAccount}
+          style={[
+            styles.menuItem,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.error,
+              borderWidth: 1,
+              borderRadius: radii.md,
+              marginBottom: spacing.xxl,
+              padding: spacing.md,
+            },
+          ]}
+          testID="btn-delete-account"
+        >
+          <View style={styles.inlineRow}>
+            <Trash2 size={20} color={colors.error} />
+            <View style={{ marginLeft: spacing.md, flex: 1 }}>
+              <Text style={[typography.bodyMedium, { color: colors.error, fontWeight: '600' }]}>
+                {deletingAccount ? 'Scheduling Deletion...' : 'Delete Account'}
+              </Text>
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                Permanently purge all nutrition logs and personal data
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.error} />
+          </View>
+        </Pressable>
       </ScrollView>
 
       {/* ================= MODAL: EDIT BIOMETRICS ================= */}

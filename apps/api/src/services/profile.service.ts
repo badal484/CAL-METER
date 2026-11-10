@@ -328,4 +328,61 @@ export class ProfileService {
       calculations: calculationsDto,
     };
   }
+
+  /**
+   * Initiates account deletion for compliance with GDPR, DPDP, and Apple App Store Guideline 5.1.1(v).
+   * Soft-deletes user record, registers DeletionRequest scheduled for 30-day purge,
+   * purges device notification tokens to halt any push messages, and suspends the user.
+   */
+  async deleteAccount(userId: string): Promise<{ success: boolean; scheduledPurgeAt: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found.');
+    }
+
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days retention grace period
+
+    await this.prisma.$transaction(async tx => {
+      // 1. Soft-delete user and revoke active status
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          deletedAt: now,
+          isSuspended: true,
+          suspensionReason: 'User initiated account deletion',
+          suspendedAt: now,
+        },
+      });
+
+      // 2. Clear device tokens so no notifications are sent
+      await tx.deviceToken.deleteMany({
+        where: { userId },
+      });
+
+      // 3. Upsert DeletionRequest
+      await tx.deletionRequest.upsert({
+        where: { userId },
+        create: {
+          userId,
+          requestedAt: now,
+          scheduledAt,
+          isProcessed: false,
+        },
+        update: {
+          requestedAt: now,
+          scheduledAt,
+          isProcessed: false,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      scheduledPurgeAt: scheduledAt.toISOString(),
+    };
+  }
 }

@@ -1693,7 +1693,8 @@ describe('Contracts Runtime Schema Validation', () => {
 
   describe('Product Analytics Contracts (Part 13)', () => {
     it('validates TrackAnalyticsEventSchema and BatchAnalyticsEventsSchema', async () => {
-      const { TrackAnalyticsEventSchema, BatchAnalyticsEventsSchema } = await import('../src/analytics.contract.js');
+      const { TrackAnalyticsEventSchema, BatchAnalyticsEventsSchema } =
+        await import('../src/analytics.contract.js');
       const { AnalyticsEventName } = await import('@calmeter/shared');
 
       const single = {
@@ -1756,7 +1757,8 @@ describe('Contracts Runtime Schema Validation', () => {
 
   describe('Web Admin Panel & Operations Contracts (Part 14)', () => {
     it('validates ProvisionAdminInputSchema and UpdateAdminRoleInputSchema', async () => {
-      const { ProvisionAdminInputSchema, UpdateAdminRoleInputSchema } = await import('../src/admin.contract.js');
+      const { ProvisionAdminInputSchema, UpdateAdminRoleInputSchema } =
+        await import('../src/admin.contract.js');
       const { AdminRole } = await import('@calmeter/shared');
 
       const provisionPayload = {
@@ -1819,7 +1821,8 @@ describe('Contracts Runtime Schema Validation', () => {
     });
 
     it('validates CreateRecipeInputSchema and CreateSupportTicketInputSchema', async () => {
-      const { CreateRecipeInputSchema, CreateSupportTicketInputSchema } = await import('../src/admin.contract.js');
+      const { CreateRecipeInputSchema, CreateSupportTicketInputSchema } =
+        await import('../src/admin.contract.js');
       const { SupportTicketCategory, SupportTicketPriority } = await import('@calmeter/shared');
 
       const recipe = {
@@ -1831,7 +1834,11 @@ describe('Contracts Runtime Schema Validation', () => {
         prepTimeMinutes: 10,
         cookTimeMinutes: 15,
         difficulty: 'EASY',
-        instructions: ['Heat oil in a pan', 'Saute onions and cumin', 'Crumble fresh paneer and serve'],
+        instructions: [
+          'Heat oil in a pan',
+          'Saute onions and cumin',
+          'Crumble fresh paneer and serve',
+        ],
         ingredients: [
           { name: 'Paneer', amount: '200g', calories: 530 },
           { name: 'Onion', amount: '1 medium', calories: 45 },
@@ -1858,5 +1865,3 @@ describe('Contracts Runtime Schema Validation', () => {
     });
   });
 });
-
-

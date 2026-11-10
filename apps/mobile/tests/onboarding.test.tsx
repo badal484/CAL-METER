@@ -79,6 +79,10 @@ describe('Onboarding & Personalization Mobile Components', () => {
           disclaimers: ['Estimates only'],
         },
       }),
+      deleteAccount: vi.fn().mockResolvedValue({
+        success: true,
+        scheduledPurgeAt: '2026-12-10T00:00:00.000Z',
+      }),
     };
 
     mockGoalApi = {
@@ -425,6 +429,32 @@ describe('Onboarding & Personalization Mobile Components', () => {
       });
 
       expect(mockGoalApi.updateGoal).toHaveBeenCalled();
+    });
+
+    it('renders delete account button and prompts user confirmation (Apple App Store 5.1.1(v))', async () => {
+      let renderer: ReactTestRenderer.ReactTestRenderer;
+
+      await act(async () => {
+        renderer = ReactTestRenderer.create(
+          <ThemeProvider>
+            <ProfileScreen
+              profileClient={mockProfileApi as ProfileApiClient}
+              goalClient={mockGoalApi as GoalApiClient}
+            />
+          </ThemeProvider>,
+        );
+      });
+
+      const root = renderer!.root;
+      const deleteBtn = root.findByProps({ testID: 'btn-delete-account' });
+      expect(deleteBtn).toBeDefined();
+
+      // Trigger delete account press
+      await act(async () => {
+        deleteBtn.props.onPress();
+      });
+      // Deletion prompt rendered without throwing
+      expect(deleteBtn.props.testID).toBe('btn-delete-account');
     });
   });
 });

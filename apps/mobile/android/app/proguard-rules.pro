@@ -8,3 +8,28 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# React Native & Hermes Bytecode Preservation
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.jni.** { *; }
+-keep class com.facebook.hermes.unicode.** { *; }
+-keep class com.facebook.react.turbomodule.** { *; }
+
+# OkHttp & Network Security
+-keepattributes *Annotation*
+-keepclassmembers class * {
+    @org.webkit.common.annotations.DoNotStrip <fields>;
+    @org.webkit.common.annotations.DoNotStrip <methods>;
+}
+
+# Keep native methods and JNI bindings
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# RevenueCat Purchases SDK
+-keep class com.revenuecat.purchases.** { *; }
+
+# CameraKit & Barcode Scanner
+-keep class com.camerakit.** { *; }
+

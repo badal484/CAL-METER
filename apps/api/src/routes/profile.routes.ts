@@ -67,5 +67,26 @@ export function createProfileRouter(options?: ProfileRouterOptions): Router {
     }
   });
 
+  /**
+   * DELETE /profile
+   * Initiates account deletion for compliance with GDPR, DPDP, and Apple App Store Guideline 5.1.1(v).
+   */
+  router.delete('/', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = await getUserId(req);
+      const result = await profileService.deleteAccount(userId);
+      res.status(200).json({
+        success: true,
+        data: {
+          message:
+            'Account deletion initiated successfully. All personal data will be purged within 30 days.',
+          ...result,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

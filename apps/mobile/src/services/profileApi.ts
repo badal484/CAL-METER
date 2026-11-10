@@ -153,4 +153,22 @@ export class ProfileApiClient {
     const json = (await res.json()) as any;
     return json.data as WeightLogDto[];
   }
+
+  /**
+   * Requests account deletion.
+   * Required for Apple App Store Guideline 5.1.1(v), Google Play, and DPDP/GDPR compliance.
+   */
+  async deleteAccount(token?: string): Promise<{ success: boolean; scheduledPurgeAt: string }> {
+    const headers = await this.buildHeaders(token);
+    const url = `${this.baseUrl}/profile`;
+
+    const res = await fetch(url, { method: 'DELETE', headers });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as any;
+      throw new Error(err.error?.message || `Failed to delete account (status ${res.status})`);
+    }
+
+    const json = (await res.json()) as any;
+    return json.data;
+  }
 }
