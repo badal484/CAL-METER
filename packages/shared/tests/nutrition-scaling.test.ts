@@ -12,8 +12,8 @@ describe('Nutrition Scaling', () => {
     fiberGrams: 0,
     micronutrients: {
       ironMg: 1.04,
-      sodiumMg: 74,
-    },
+      sodiumMg: 74
+    }
   };
 
   it('correctly scales nutrients from 100g to 250g (factor 2.5)', () => {
@@ -47,7 +47,7 @@ describe('Nutrition Scaling', () => {
       calories: 220,
       proteinGrams: 4,
       carbsGrams: 28,
-      fatGrams: 11,
+      fatGrams: 11
     };
 
     const scaled = scaleNutrients(packageNutrients, 90, 45); // 2 packages
@@ -65,3 +65,4 @@ describe('Nutrition Scaling', () => {
     expect(() => scaleNutrients(basePer100g, 100, 0)).toThrow(DomainValidationError);
   });
 });
+

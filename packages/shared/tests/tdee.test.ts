@@ -37,12 +37,13 @@ describe('TDEE Calculation', () => {
   });
 
   it('throws DomainValidationError for physiologically implausible BMR', () => {
-    expect(() => calculateTdee({ bmr: 200, activityLevel: ActivityLevel.SEDENTARY })).toThrow(
-      DomainValidationError,
-    );
+    expect(() =>
+      calculateTdee({ bmr: 200, activityLevel: ActivityLevel.SEDENTARY })
+    ).toThrow(DomainValidationError);
 
-    expect(() => calculateTdee({ bmr: 6000, activityLevel: ActivityLevel.SEDENTARY })).toThrow(
-      DomainValidationError,
-    );
+    expect(() =>
+      calculateTdee({ bmr: 6000, activityLevel: ActivityLevel.SEDENTARY })
+    ).toThrow(DomainValidationError);
   });
 });
+

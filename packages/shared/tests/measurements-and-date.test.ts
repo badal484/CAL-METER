@@ -8,14 +8,14 @@ import {
   cmToFeetInches,
   mlToFlOz,
   flOzToMl,
-  roundTo,
+  roundTo
 } from '../src/utils/measurements.js';
 import {
   formatDateToIso,
   parseIsoDate,
   isValidIsoDate,
   addDays,
-  getDaysDifference,
+  getDaysDifference
 } from '../src/utils/date.js';
 
 describe('Measurement Conversions', () => {
@@ -79,3 +79,4 @@ describe('Date Utilities', () => {
     expect(getDaysDifference(d1, d2)).toBe(9);
   });
 });
+

@@ -14,7 +14,7 @@ describe('Calorie Target Calculation', () => {
       tdee,
       bmr,
       primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-      paceKgPerWeek: 0.5,
+      paceKgPerWeek: 0.5
     });
 
     expect(result.dailyCalories).toBe(1950);
@@ -29,7 +29,7 @@ describe('Calorie Target Calculation', () => {
     const result = calculateCalorieTarget({
       tdee,
       bmr,
-      primaryGoal: PrimaryGoal.MAINTAIN_WEIGHT,
+      primaryGoal: PrimaryGoal.MAINTAIN_WEIGHT
     });
 
     expect(result.dailyCalories).toBe(2500);
@@ -42,7 +42,7 @@ describe('Calorie Target Calculation', () => {
     const result = calculateCalorieTarget({
       tdee,
       bmr,
-      primaryGoal: PrimaryGoal.BUILD_MUSCLE,
+      primaryGoal: PrimaryGoal.BUILD_MUSCLE
     });
 
     expect(result.dailyCalories).toBe(2750);
@@ -57,7 +57,7 @@ describe('Calorie Target Calculation', () => {
         tdee,
         bmr,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        paceKgPerWeek: 0.9,
+        paceKgPerWeek: 0.9
       });
 
       expect(result.deficitPercentageOfTdee).toBeGreaterThan(25);
@@ -69,7 +69,7 @@ describe('Calorie Target Calculation', () => {
         tdee,
         bmr,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        paceKgPerWeek: 1.2,
+        paceKgPerWeek: 1.2
       });
 
       expect(result.warnings.some(w => w.includes('considered aggressive'))).toBe(true);
@@ -81,7 +81,7 @@ describe('Calorie Target Calculation', () => {
         tdee: 1800,
         bmr: 1500,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        paceKgPerWeek: 0.5,
+        paceKgPerWeek: 0.5
       });
 
       expect(result.isBelowBmr).toBe(true);
@@ -93,7 +93,7 @@ describe('Calorie Target Calculation', () => {
         tdee,
         bmr,
         primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-        customCalorieOverride: 1800,
+        customCalorieOverride: 1800
       });
 
       expect(result.dailyCalories).toBe(1800);
@@ -106,9 +106,10 @@ describe('Calorie Target Calculation', () => {
           tdee,
           bmr,
           primaryGoal: PrimaryGoal.LOSE_WEIGHT,
-          customCalorieOverride: 400,
-        }),
+          customCalorieOverride: 400
+        })
       ).toThrow(DomainValidationError);
     });
   });
 });
+

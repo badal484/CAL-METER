@@ -11,9 +11,9 @@ describe('Macronutrient Calculation', () => {
     // Fiber: (2000 / 1000) * 14 = 28g
     const result = calculateMacronutrients({
       dailyCalories: 2000,
-      proteinPercentage: 0.3,
-      carbsPercentage: 0.4,
-      fatPercentage: 0.3,
+      proteinPercentage: 0.30,
+      carbsPercentage: 0.40,
+      fatPercentage: 0.30
     });
 
     expect(result.dailyCalories).toBe(2000);
@@ -31,7 +31,7 @@ describe('Macronutrient Calculation', () => {
       dailyCalories: 2100,
       customProteinGrams: 160,
       customCarbsGrams: 220,
-      customFatGrams: 65,
+      customFatGrams: 65
     });
 
     expect(result.proteinGrams).toBe(160);
@@ -46,18 +46,18 @@ describe('Macronutrient Calculation', () => {
     expect(() =>
       calculateMacronutrients({
         dailyCalories: 2000,
-        proteinPercentage: 0.4,
-        carbsPercentage: 0.4,
-        fatPercentage: 0.4, // Sum = 1.20 (120%)
-      }),
+        proteinPercentage: 0.40,
+        carbsPercentage: 0.40,
+        fatPercentage: 0.40 // Sum = 1.20 (120%)
+      })
     ).toThrow(DomainValidationError);
   });
 
   it('throws DomainValidationError if dailyCalories <= 0', () => {
     expect(() =>
       calculateMacronutrients({
-        dailyCalories: 0,
-      }),
+        dailyCalories: 0
+      })
     ).toThrow(DomainValidationError);
   });
 
@@ -67,8 +67,9 @@ describe('Macronutrient Calculation', () => {
         dailyCalories: 2000,
         customProteinGrams: -10,
         customCarbsGrams: 200,
-        customFatGrams: 60,
-      }),
+        customFatGrams: 60
+      })
     ).toThrow(DomainValidationError);
   });
 });
+
