@@ -62,6 +62,16 @@ export function flOzToMl(flOz: number): number {
   return roundTo(flOz / 0.033814, 2);
 }
 
+export function mlToLiters(ml: number): number {
+  assertFiniteNumber(ml, 'Volume in ml');
+  return roundTo(ml / 1000, 3);
+}
+
+export function litersToMl(liters: number): number {
+  assertFiniteNumber(liters, 'Volume in liters');
+  return roundTo(liters * 1000, 0);
+}
+
 export function roundTo(value: number, decimals: number = 2): number {
   if (!Number.isFinite(value)) {
     throw new DomainValidationError(`Value to round must be a finite number (received: ${value}).`);

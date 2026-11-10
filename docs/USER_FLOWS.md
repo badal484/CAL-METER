@@ -310,3 +310,53 @@ sequenceDiagram
     API-->>Client: Presigned URL issued successfully
     Client->>User: Seamlessly resumes photo scan without restarting
 ```
+
+---
+
+## 7. Journey 6: Weight, Hydration & Physical Activity Tracking Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant App as Mobile App (Progress Tab)
+    participant API as Backend Tracking API
+    participant DB as PostgreSQL Database
+
+    User->>App: Opens Progress Tab
+    App->>API: GET /tracking/progress?days=30
+    API->>DB: Query WeightLog, WaterLog, ExerciseLog, & active NutritionGoal
+    DB-->>API: Aggregated metric sets
+    API-->>App: ProgressReportDto (Weight trend, Water stats, Exercise breakdown, Disclaimers)
+    App->>User: Displays Progress Dashboard & historical charts
+
+    alt Log Body Weight
+        User->>App: Taps "Log Weight" & enters 79.5 kg
+        App->>API: POST /tracking/weight { weightKg: 79.5, source: "MANUAL" }
+        API->>DB: Check 10s idempotency window & INSERT WeightLog
+        API->>DB: UPDATE UserProfile.currentWeightKg = 79.5
+        DB-->>API: Saved record
+        API-->>App: 201 Created (WeightLogDto)
+        App->>User: Updates trend chart, net change (-2.5 kg), and progress %
+    else Quick-Add Water Intake
+        User->>App: Taps "+500 ml" quick-add button
+        App->>API: POST /tracking/water { amountMl: 500, date: "2026-11-10", source: "QUICK_ADD" }
+        API->>DB: INSERT WaterLog
+        DB-->>API: Saved record
+        API-->>App: 201 Created (WaterLogDto)
+        App->>API: GET /tracking/water/summary/2026-11-10
+        API-->>App: Updated DailyWaterSummaryDto (1500 / 2500 ml, 60%)
+        App->>User: Animate progress bar to 60%
+    else Log Physical Activity
+        User->>App: Taps "+ Log Activity" (Running, 35 min, Moderate)
+        App->>User: Toggles "Auto-estimate calories using Compendium MET formula"
+        App->>API: POST /tracking/exercise { name: "Morning Run", category: "RUNNING", durationMinutes: 35, estimateCalories: true }
+        API->>DB: Query UserProfile for currentWeightKg
+        API->>API: Compute MET equation (12.0 * 79.5 * 35/60 = 557 kcal)
+        API->>DB: INSERT ExerciseLog (caloriesBurned: 557, calorieSource: MET_FORMULA)
+        DB-->>API: Saved record
+        API-->>App: 201 Created (ExerciseLogDto)
+        App->>User: Updates total sessions, active minutes, and burned calories
+        Note over App,User: Exercise calories are NOT added to daily food calorie allowance
+    end
+```

@@ -19,6 +19,7 @@ erDiagram
     User ||--o{ FoodScanLog : "initiates"
     User ||--o{ WeightLog : "records"
     User ||--o{ WaterLog : "tracks"
+    User ||--o{ ExerciseLog : "performs"
     User ||--o| Subscription : "holds"
     User ||--o{ FoodItem : "creates (custom)"
 
@@ -254,6 +255,44 @@ erDiagram
         datetime expiresAt
         string cancelReason
     }
+
+    WeightLog {
+        uuid id PK
+        uuid userId FK
+        decimal weightKg
+        datetime loggedAt
+        string notes
+        string source
+        datetime updatedAt
+    }
+
+    WaterLog {
+        uuid id PK
+        uuid userId FK
+        date date
+        int amountMl
+        datetime loggedAt
+        string source
+        datetime updatedAt
+    }
+
+    ExerciseLog {
+        uuid id PK
+        uuid userId FK
+        string name
+        enum category
+        int durationMinutes
+        datetime performedAt
+        date date
+        decimal distanceKm
+        enum intensity
+        decimal caloriesBurned
+        enum calorieSource
+        decimal metValue
+        string notes
+        datetime createdAt
+        datetime updatedAt
+    }
 ```
 
 ---
@@ -367,6 +406,30 @@ enum ImportStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum ExerciseCategory {
+  WALKING
+  RUNNING
+  CYCLING
+  SWIMMING
+  GYM_WORKOUT
+  STRENGTH_TRAINING
+  YOGA
+  SPORTS
+  OTHER
+}
+
+enum ExerciseIntensity {
+  LIGHT
+  MODERATE
+  VIGOROUS
+}
+
+enum CalorieEstimateSource {
+  MET_FORMULA
+  MANUAL_ENTRY
+  DEVICE
 }
 
 // -------------------------------------------------------------
@@ -752,6 +815,8 @@ model WeightLog {
   weightKg  Decimal  @map("weight_kg") @db.Decimal(5, 2)
   loggedAt  DateTime @default(now()) @map("logged_at")
   notes     String?  @db.VarChar(255)
+  source    String   @default("MANUAL") @db.VarChar(50)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -765,11 +830,38 @@ model WaterLog {
   date      DateTime @db.Date
   amountMl  Int      @map("amount_ml")
   loggedAt  DateTime @default(now()) @map("logged_at")
+  source    String   @default("MANUAL") @db.VarChar(50)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
   @@map("water_logs")
+}
+
+model ExerciseLog {
+  id              String                @id @default(uuid()) @db.Uuid
+  userId          String                @map("user_id") @db.Uuid
+  name            String                @db.VarChar(100)
+  category        ExerciseCategory
+  durationMinutes Int                   @map("duration_minutes")
+  performedAt     DateTime              @default(now()) @map("performed_at")
+  date            DateTime              @default(now()) @map("date") @db.Date
+  distanceKm      Decimal?              @map("distance_km") @db.Decimal(6, 2)
+  intensity       ExerciseIntensity     @default(MODERATE)
+  caloriesBurned  Decimal?              @map("calories_burned") @db.Decimal(7, 2)
+  calorieSource   CalorieEstimateSource? @map("calorie_source")
+  metValue        Decimal?              @map("met_value") @db.Decimal(4, 2)
+  notes           String?               @db.VarChar(500)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @default(now()) @updatedAt @map("updated_at")
+
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date(sort: Desc)])
+  @@index([userId, performedAt(sort: Desc)])
+  @@index([userId, category])
+  @@map("exercise_logs")
 }
 
 model Subscription {

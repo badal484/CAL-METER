@@ -7,7 +7,10 @@ import {
   PresignUploadRequestSchema,
   CommitMealRequestSchema,
   LogWeightSchema,
+  UpdateWeightLogSchema,
   LogWaterSchema,
+  LogExerciseSchema,
+  UpdateExerciseLogSchema,
   FoodServingConversionSchema,
   FoodNutrientProfileSchema,
   CreateCustomFoodSchema,
@@ -27,6 +30,8 @@ import {
   ServingProvenance,
   DataQuality,
   FoodSource,
+  ExerciseCategory,
+  ExerciseIntensity,
 } from '@calmeter/shared';
 
 describe('Contracts Runtime Schema Validation', () => {
@@ -461,6 +466,40 @@ describe('Contracts Runtime Schema Validation', () => {
       expect(LogWaterSchema.safeParse({ ...base, amountMl: Infinity }).success).toBe(false);
       expect(LogWaterSchema.safeParse({ ...base, amountMl: 6000 }).success).toBe(false); // > 5000 limit
       expect(LogWaterSchema.safeParse({ date: '2026-02-30', amountMl: 500 }).success).toBe(false);
+    });
+
+    it('validates UpdateWeightLogSchema partial updates', () => {
+      expect(UpdateWeightLogSchema.safeParse({ weightKg: 82.5 }).success).toBe(true);
+      expect(UpdateWeightLogSchema.safeParse({ notes: 'After morning run' }).success).toBe(true);
+      expect(UpdateWeightLogSchema.safeParse({ weightKg: 20 }).success).toBe(false);
+    });
+
+    it('validates LogExerciseSchema with valid parameters', () => {
+      const valid = {
+        name: 'Morning Jog',
+        category: ExerciseCategory.RUNNING,
+        durationMinutes: 30,
+        distanceKm: 4.5,
+        intensity: ExerciseIntensity.MODERATE,
+      };
+      expect(LogExerciseSchema.safeParse(valid).success).toBe(true);
+    });
+
+    it('rejects LogExerciseSchema with zero or excessive duration', () => {
+      const base = {
+        name: 'Yoga Session',
+        category: ExerciseCategory.YOGA,
+      };
+      expect(LogExerciseSchema.safeParse({ ...base, durationMinutes: 0 }).success).toBe(false);
+      expect(LogExerciseSchema.safeParse({ ...base, durationMinutes: -15 }).success).toBe(false);
+      expect(LogExerciseSchema.safeParse({ ...base, durationMinutes: 1500 }).success).toBe(false); // > 1440
+    });
+
+    it('validates UpdateExerciseLogSchema optional updates', () => {
+      expect(UpdateExerciseLogSchema.safeParse({ durationMinutes: 45 }).success).toBe(true);
+      expect(UpdateExerciseLogSchema.safeParse({ notes: 'Felt energetic' }).success).toBe(true);
+      expect(UpdateExerciseLogSchema.safeParse({ caloriesBurned: 350 }).success).toBe(true);
+      expect(UpdateExerciseLogSchema.safeParse({ caloriesBurned: -50 }).success).toBe(false);
     });
   });
 

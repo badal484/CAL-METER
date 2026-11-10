@@ -4,3 +4,4 @@ export * from './diaryApi.js';
 export * from './barcodeApi.js';
 export * from './profileApi.js';
 export * from './goalApi.js';
+export * from './trackingApi.js';

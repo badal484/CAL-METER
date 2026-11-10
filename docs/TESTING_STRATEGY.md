@@ -198,3 +198,39 @@ flowchart LR
     IntegrationTests --> BuildCheck[Mobile Compilation Dry Run]
     BuildCheck --> MergeApproval[PR Approved for Merge]
 ```
+
+---
+
+## 7. Progress, Water & Exercise Tracking Test Suites (Part 10)
+
+Part 10 introduces rigorous end-to-end verification across the entire monorepo stack:
+
+### 7.1. Shared Formulas & Unit Conversions (`packages/shared/tests/exercise.test.ts`)
+
+- **MET Calorie Formula Verification:** Validates standard Compendium of Physical Activities equations:
+  $$\text{Calories Burned} = \text{MET} \times \text{weightKg} \times \left(\frac{\text{durationMinutes}}{60}\right)$$
+- **Boundary & Clamp Assertions:** Tests intensity variations (Light, Moderate, Vigorous) across all 9 categories (Walking, Running, Cycling, Swimming, Gym, Strength, Yoga, Sports, Other).
+- **Error Assertions:** Verifies negative or non-finite inputs, duration $> 1440$ min, and weight bounds ($< 30$ kg or $> 350$ kg) throw `DomainValidationError`.
+
+### 7.2. Contract Validation (`packages/contracts/tests/contracts.test.ts`)
+
+- **Weight Contracts:** Validates `LogWeightSchema` and `UpdateWeightLogSchema` boundary constraints.
+- **Water Contracts:** Validates `LogWaterSchema` ($1 \le \text{amountMl} \le 5000$) and `UpdateWaterLogSchema`.
+- **Exercise Contracts:** Validates `LogExerciseSchema`, `UpdateExerciseLogSchema`, and duration bounds ($1 \le \text{minutes} \le 1440$).
+- **Progress Report Contracts:** Validates date range validation and multi-metric response schemas.
+
+### 7.3. Backend Integration & Security Tests (`apps/api/tests/trackingProgress.test.ts`)
+
+- **10-Second Retry Idempotency:** Submitting duplicate weight measurements within a 10-second window returns the existing record without generating duplicate rows.
+- **Profile Synchronization:** Creating, updating, or deleting weight measurements automatically synchronizes `UserProfile.currentWeightKg` to reflect the chronological latest entry.
+- **Goal-Linked Hydration:** Validates daily summaries dynamically resolve targets against `NutritionGoal.waterMl` effective on the target date.
+- **Multi-Tenant Scoping:** Verifies User A cannot read, update, or delete User B's weight, water, or exercise records (anti-enumeration 404s).
+- **Exercise Calorie Isolation:** Verifies exercise records and progress summaries explicitly maintain non-diet-credit disclaimers.
+
+### 7.4. Mobile Component & Workflow Tests (`apps/mobile/tests/progress.test.tsx`)
+
+- **Dashboard Metric Rendering:** Verifies body weight, hydration bar, activity summary, and non-medical disclaimers render correctly.
+- **Interactive Range Toggles:** Asserts switching between `7D`, `30D`, `90D`, and `1Y` triggers parameterized API queries with corresponding day counts.
+- **Unit Conversions:** Validates client-side toggling between `kg`/`lbs` and `ml`/`L`/`fl oz` converts displayed values accurately.
+- **Quick-Add Actions:** Asserts tapping hydration quick-add buttons dispatches API calls with `{ source: "QUICK_ADD" }` and updates the progress indicator.
+- **Error & Offline Resilience:** Asserts network errors display `ErrorState` with retry pathways.

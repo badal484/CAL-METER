@@ -269,3 +269,10 @@ CAL METER adheres to strict privacy-by-design principles regarding mobile camera
 - Mifflin-St Jeor and standard adult energy expenditure models are clinically invalid for pediatric populations.
 - All onboarding and recalculation endpoints strictly reject individuals under 18 years of age, preventing the application of adult restriction targets to developing minors.
 - Physiological bounds checks enforce reasonable constraints on all inputs (weight: 30–350 kg, height: 100–250 cm, age: 18–120 years). Any values outside validated bounds fail closed with `VALIDATION_ERROR`.
+
+### 8.4. Physical Activity, Hydration & Progress Tracking Safeguards
+
+- **Row-Level Tenant Authorization:** All operations across `weight_logs`, `water_logs`, and `exercise_logs` enforce strict compound foreign-key isolation (`WHERE id = :id AND user_id = :authUserId`). Unauthenticated or cross-tenant access attempts immediately fail closed with 404 (anti-enumeration).
+- **Zero Third-Party AI Exposure for Activity & Biometrics:** Weight logs, hydration volumes, and physical exercise history are strictly sequestered from external LLM/vision inference providers. They are stored and queried only in private PostgreSQL tables.
+- **Exercise Calorie Non-Diet-Credit Guarantee:** In accordance with evidence-based behavioral nutrition, exercise calories are tracked solely as physical activity progress and are strictly NOT credited to dietary food allowances. This architectural constraint protects users from overestimating expenditure and inadvertently inducing positive energy balances.
+- **Hydration & Progress Educational Disclaimers:** Progress reports and water summaries include explicit notifications that day-to-day weight fluctuations of ±0.5–1.5 kg are physiologically normal due to water retention, sodium, and glycogen replenishment, and that water baselines do not constitute personalized clinical fluid prescriptions.

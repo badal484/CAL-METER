@@ -1009,16 +1009,20 @@ Deletes a logged food item and atomically recalculates the parent meal's totals.
 
 ### Module 6: Tracking (`/tracking`)
 
-#### `POST /tracking/weight`
+#### 1. Weight Tracking Endpoints
 
-Records a new body weight measurement in `WeightLog` and automatically synchronizes `UserProfile.currentWeightKg`.
+##### `POST /tracking/weight`
+
+Records a new body weight measurement in `WeightLog` and automatically synchronizes `UserProfile.currentWeightKg`. Includes 10-second idempotency deduplication window against rapid retry submissions.
 
 - **Request Body:**
 
 ```json
 {
-  "weightKg": 81.6,
-  "notes": "Morning weigh-in before breakfast"
+  "weightKg": 79.5,
+  "notes": "Morning weigh-in before breakfast",
+  "source": "MANUAL",
+  "loggedAt": "2026-11-10T07:30:00.000Z"
 }
 ```
 
@@ -1030,19 +1034,129 @@ Records a new body weight measurement in `WeightLog` and automatically synchroni
   "data": {
     "id": "2c62c2f8-d4f1-4db8-9e66-7e3fba537b01",
     "userId": "c53d9e03-34e8-4221-a320-141a27e777e5",
-    "weightKg": 81.6,
-    "loggedAt": "2026-11-10T14:30:00.000Z",
-    "notes": "Morning weigh-in before breakfast"
+    "weightKg": 79.5,
+    "loggedAt": "2026-11-10T07:30:00.000Z",
+    "notes": "Morning weigh-in before breakfast",
+    "source": "MANUAL"
   }
 }
 ```
 
-#### `GET /tracking/weight`
+##### `GET /tracking/weight`
 
-Returns historical weight logs for the authenticated user, ordered by `loggedAt DESC`.
+Retrieves historical weight logs ordered by `loggedAt DESC`. Supports `limit`, `startDate`, and `endDate` query parameters.
 
-- `GET /tracking/water/:date`: Returns water consumption in ml for that day.
-- `POST /tracking/water`: Logs water intake increment (`{ "amountMl": 250, "date": "2026-11-10" }`).
+##### `GET /tracking/weight/summary`
+
+Calculates comprehensive weight progress statistics comparing starting weight, previous weight, current weight, target weight, net delta, progress percentage, and trend (`LOSING`, `GAINING`, `MAINTAINING`, `INSUFFICIENT_DATA`).
+
+##### `PATCH /tracking/weight/:id`
+
+Updates an existing weight reading and synchronizes active profile current weight if the updated record is the latest measurement.
+
+##### `DELETE /tracking/weight/:id`
+
+Deletes a weight log entry and restores `UserProfile.currentWeightKg` to the remaining latest entry.
+
+---
+
+#### 2. Water Tracking Endpoints
+
+##### `POST /tracking/water`
+
+Logs a water intake increment in milliliters.
+
+- **Request Body:**
+
+```json
+{
+  "amountMl": 500,
+  "date": "2026-11-10",
+  "source": "QUICK_ADD"
+}
+```
+
+##### `GET /tracking/water/summary/:date`
+
+Returns daily water summary for the specified date (`YYYY-MM-DD`), resolving the target against the active `NutritionGoal.waterMl` and calculating completion percentage with non-medical lifestyle disclaimers.
+
+##### `GET /tracking/water/:date`
+
+Retrieves all individual water log entries recorded for the specified date.
+
+##### `PATCH /tracking/water/:id`
+
+Updates an existing water log volume or date.
+
+##### `DELETE /tracking/water/:id`
+
+Deletes an individual water log entry.
+
+---
+
+#### 3. Exercise Tracking Endpoints
+
+##### `POST /tracking/exercise`
+
+Logs physical exercise activity. Supports optional automated MET-based calorie burn estimation based on the Compendium of Physical Activities and the user's current profile weight.
+
+- **Request Body:**
+
+```json
+{
+  "name": "Brisk Morning Jog",
+  "category": "RUNNING",
+  "durationMinutes": 35,
+  "intensity": "MODERATE",
+  "distanceKm": 4.5,
+  "estimateCalories": true,
+  "notes": "Outdoor park run"
+}
+```
+
+- **Response (`201 Created`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "e44c6809-5c91-4dcb-9263-df6a3cc4601c",
+    "userId": "c53d9e03-34e8-4221-a320-141a27e777e5",
+    "name": "Brisk Morning Jog",
+    "category": "RUNNING",
+    "durationMinutes": 35,
+    "intensity": "MODERATE",
+    "distanceKm": 4.5,
+    "caloriesBurned": 343,
+    "calorieSource": "MET_FORMULA",
+    "metValue": 9.8,
+    "performedAt": "2026-11-10T07:00:00.000Z",
+    "date": "2026-11-10"
+  }
+}
+```
+
+##### `GET /tracking/exercise`
+
+Retrieves physical activities with optional filtering by `date`, `startDate`, `endDate`, and `limit`.
+
+##### `PATCH /tracking/exercise/:id`
+
+Updates activity parameters (e.g., duration, distance, intensity, manual calories).
+
+##### `DELETE /tracking/exercise/:id`
+
+Removes an exercise activity record.
+
+---
+
+#### 4. Progress Reporting Endpoint
+
+##### `GET /tracking/progress`
+
+Aggregates multi-metric progress reports over customizable timeframes (`days=7|30|90|365` or explicit `startDate` & `endDate`). Combines weight trend series, hydration adherence rate, and physical activity distributions by category.
+
+Includes non-diet-credit and non-medical wellness notices confirming exercise calories are not credited to daily food budgets.
 
 ---
 

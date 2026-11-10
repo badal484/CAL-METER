@@ -122,3 +122,33 @@ export enum GoalStatus {
   ARCHIVED = 'ARCHIVED',
   SUPERSEDED = 'SUPERSEDED',
 }
+
+export enum ExerciseCategory {
+  WALKING = 'WALKING',
+  RUNNING = 'RUNNING',
+  CYCLING = 'CYCLING',
+  SWIMMING = 'SWIMMING',
+  GYM_WORKOUT = 'GYM_WORKOUT',
+  STRENGTH_TRAINING = 'STRENGTH_TRAINING',
+  YOGA = 'YOGA',
+  SPORTS = 'SPORTS',
+  OTHER = 'OTHER',
+}
+
+export enum ExerciseIntensity {
+  LIGHT = 'LIGHT',
+  MODERATE = 'MODERATE',
+  VIGOROUS = 'VIGOROUS',
+}
+
+export enum CalorieEstimateSource {
+  MET_FORMULA = 'MET_FORMULA',
+  MANUAL_ENTRY = 'MANUAL_ENTRY',
+  DEVICE = 'DEVICE',
+}
+
+export enum WaterUnit {
+  ML = 'ML',
+  LITER = 'LITER',
+  FL_OZ = 'FL_OZ',
+}

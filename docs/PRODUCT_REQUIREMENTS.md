@@ -201,6 +201,17 @@ flowchart TD
 - **FR-12.4:** Itemized list of foods with individual calories, serving size, and quick action sheet.
 - **FR-12.5:** Historical Calendar View: Swipeable date carousel to view past dates and log retrospectively.
 
+### 5.6B. Weight, Hydration & Activity Tracking (Features 13, 14, 18, 19)
+
+- **FR-13.1 (Weight Logging):** Canonical kilogram storage with user display preference support (kg or lbs). Enforces realistic bounds (30–350 kg / 66.1–771.6 lbs) with 10-second retry idempotency.
+- **FR-13.2 (Profile Weight Sync):** Automatically synchronizes `UserProfile.currentWeightKg` to match the single latest weight entry by `loggedAt` without mutating historical records.
+- **FR-14.1 (Hydration Tracking):** Canonical milliliter storage with quick-add actions (+250 ml, +500 ml, +750 ml) and unit display options (ml, L, fl oz).
+- **FR-14.2 (Water Targets):** Dynamically evaluates daily progress against active `NutritionGoal.waterMl` (or default 2,500 ml) accompanied by explicit non-medical disclaimers.
+- **FR-18.1 (Physical Activity):** Logs physical exercises across 9 standard categories with duration (1–1440 min), optional distance, and intensity rating.
+- **FR-18.2 (Compendium MET Calculations):** Optional automated calorie burn estimates calculated via Compendium of Physical Activities MET formulas using the user's latest body weight.
+- **FR-18.3 (Non-Diet-Credit Guarantee):** Exercise calories burned are tracked as activity progress and are strictly NOT added to the user's dietary food allowance, ensuring predictable energy balance.
+- **FR-19.1 (Multi-Metric Progress):** Unified progress reporting endpoint and dashboard aggregating weight trends, hydration adherence rates, and exercise category distributions across 7D, 30D, 90D, and 1Y windows.
+
 ### 5.7. Subscription & Monetization (Feature 20)
 
 - **FR-20.1:** RevenueCat SDK integration for cross-platform App Store and Google Play billing.
