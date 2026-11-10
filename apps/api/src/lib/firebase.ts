@@ -64,6 +64,39 @@ export class FirebaseAdminTokenVerifier implements IFirebaseTokenVerifier {
   }
 
   async verifyIdToken(token: string): Promise<DecodedToken> {
+    if (process.env.NODE_ENV === 'development') {
+      const devTokens: Record<string, DecodedToken> = {
+        'token-super-admin': {
+          uid: 'dev-super-admin-uid',
+          email: 'superadmin@calmeter.dev',
+          emailVerified: true,
+          name: 'Chief Super Admin',
+        },
+        'token-ops-admin': {
+          uid: 'dev-ops-admin-uid',
+          email: 'opsadmin@calmeter.dev',
+          emailVerified: true,
+          name: 'Operations Manager',
+        },
+        'token-nutrition-editor': {
+          uid: 'dev-nutrition-editor-uid',
+          email: 'nutritioneditor@calmeter.dev',
+          emailVerified: true,
+          name: 'Lead Nutritionist',
+        },
+        'token-support-admin': {
+          uid: 'dev-support-admin-uid',
+          email: 'supportadmin@calmeter.dev',
+          emailVerified: true,
+          name: 'Customer Support Lead',
+        },
+      };
+
+      if (devTokens[token]) {
+        return devTokens[token];
+      }
+    }
+
     try {
       const decoded = await this.app.auth().verifyIdToken(token);
       if (!decoded.uid) {
