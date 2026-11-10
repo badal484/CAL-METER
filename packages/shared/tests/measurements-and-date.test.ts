@@ -142,6 +142,22 @@ describe('Date Utilities', () => {
       expect(calculateAgeFromDob('2004-02-29', refDate)).toBe(22);
     });
 
+    describe('Age Boundary Consistency (0 to 120 years)', () => {
+      it('accepts newborn born on reference date (age 0)', () => {
+        expect(calculateAgeFromDob('2026-11-10', refDate)).toBe(0);
+      });
+
+      it('accepts exact maximum supported age boundary (120 years)', () => {
+        // Born exactly 120 years ago today
+        expect(calculateAgeFromDob('1906-11-10', refDate)).toBe(120);
+      });
+
+      it('rejects one year beyond the maximum supported age (121 years)', () => {
+        // Born 121 years ago today
+        expect(() => calculateAgeFromDob('1905-11-10', refDate)).toThrow(DomainValidationError);
+      });
+    });
+
     it('rejects future date of birth with DomainValidationError', () => {
       expect(() => calculateAgeFromDob('2026-11-11', refDate)).toThrow(DomainValidationError);
       expect(() => calculateAgeFromDob('2030-01-01', refDate)).toThrow(DomainValidationError);

@@ -6,8 +6,11 @@ import { roundTo } from '../utils/measurements.js';
  * Aggregates multiple nutrient profiles (e.g. food items in a meal or meals across a day)
  * into a single unified nutrient summary.
  *
- * Validates that all incoming profiles contain finite non-negative values to prevent
- * invalid number propagation into daily summaries.
+ * Health & Safety / Engineering Principles:
+ * 1. Validates that all incoming individual profile fields contain finite non-negative values.
+ * 2. Validates accumulated totals after addition to prevent and reject numeric overflow
+ *    (e.g., from individually finite but massive IEEE-754 double precision floating-point numbers).
+ * 3. Never allows invalid or overflowed numbers to propagate into daily nutrition summaries.
  */
 export function aggregateNutrients(profiles: NutrientProfile[]): NutrientProfile {
   let totalCalories = 0;
@@ -58,6 +61,40 @@ export function aggregateNutrients(profiles: NutrientProfile[]): NutrientProfile
         }
         mergedMicros[key] = (mergedMicros[key] ?? 0) + val;
       }
+    }
+  }
+
+  // Post-addition accumulation overflow validation
+  if (!Number.isFinite(totalCalories)) {
+    throw new DomainValidationError(
+      `Accumulated calories overflowed or became non-finite (${totalCalories}).`,
+    );
+  }
+  if (!Number.isFinite(totalProtein)) {
+    throw new DomainValidationError(
+      `Accumulated protein overflowed or became non-finite (${totalProtein}).`,
+    );
+  }
+  if (!Number.isFinite(totalCarbs)) {
+    throw new DomainValidationError(
+      `Accumulated carbohydrates overflowed or became non-finite (${totalCarbs}).`,
+    );
+  }
+  if (!Number.isFinite(totalFat)) {
+    throw new DomainValidationError(
+      `Accumulated fat overflowed or became non-finite (${totalFat}).`,
+    );
+  }
+  if (totalFiber !== undefined && !Number.isFinite(totalFiber)) {
+    throw new DomainValidationError(
+      `Accumulated dietary fiber overflowed or became non-finite (${totalFiber}).`,
+    );
+  }
+  for (const [key, val] of Object.entries(mergedMicros)) {
+    if (!Number.isFinite(val)) {
+      throw new DomainValidationError(
+        `Accumulated micronutrient '${key}' overflowed or became non-finite (${val}).`,
+      );
     }
   }
 

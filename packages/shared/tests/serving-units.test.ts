@@ -151,6 +151,38 @@ describe('Food-Specific Serving Unit Conversions', () => {
     ).toBe(false);
   });
 
+  describe('Serving Conversion Overflow Prevention', () => {
+    it('rejects multiplication overflow when quantity * gramWeight overflows to Infinity', () => {
+      // 1e308 is finite, but 1e308 * 200g (Dal Tadka katori) = Infinity
+      const result = convertServingToGrams(REFERENCE_SERVING_PROFILES.DAL_TADKA, 'katori', 1e308);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('CONVERSION_OVERFLOW');
+        expect(result.message).toContain('numeric overflow');
+      }
+    });
+
+    it('rejects division overflow in convertGramsToServing when targetGrams / gramWeight overflows', () => {
+      const tinyWeightConversion: FoodServingConversion[] = [
+        {
+          unit: 'pinch',
+          gramWeight: 1e-10, // Very small finite weight
+          provenance: ServingProvenance.USER_CONFIGURED,
+        },
+      ];
+
+      // 1e300 / 1e-10 = 1e310 -> Infinity
+      const result = convertGramsToServing(tinyWeightConversion, 1e300, 'pinch');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('CONVERSION_OVERFLOW');
+        expect(result.message).toContain('numeric overflow');
+      }
+    });
+  });
+
   it('verifies reference serving profiles do not use unverified ICMR provenance and have valid provenance', () => {
     Object.values(REFERENCE_SERVING_PROFILES).forEach(profileList => {
       profileList.forEach(conv => {

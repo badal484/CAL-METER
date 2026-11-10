@@ -7,6 +7,7 @@ import {
   UnitSystem,
   BiologicalSex,
   calculateAgeFromDob,
+  MAXIMUM_SUPPORTED_AGE_YEARS,
 } from '@calmeter/shared';
 import { UuidSchema, IsoDateStringSchema } from './common.contract.js';
 
@@ -51,14 +52,13 @@ export const OnboardingDataSchema = BaseOnboardingDataSchema.refine(
   data => {
     try {
       const age = calculateAgeFromDob(data.dob);
-      return age >= 0 && age <= 120;
+      return age >= 0 && age <= MAXIMUM_SUPPORTED_AGE_YEARS;
     } catch {
       return false;
     }
   },
   {
-    message:
-      'Date of birth must correspond to a valid age (0-120 years) and cannot be in the future.',
+    message: `Date of birth must correspond to a valid age (0-${MAXIMUM_SUPPORTED_AGE_YEARS} years) and cannot be in the future.`,
     path: ['dob'],
   },
 );

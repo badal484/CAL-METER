@@ -1,4 +1,10 @@
-import { ATWATER_FACTORS, FIBER_GRAMS_PER_1000_KCAL } from '../constants/macro-ratios.js';
+import {
+  ATWATER_FACTORS,
+  FIBER_GRAMS_PER_1000_KCAL,
+  MACRO_PERCENTAGE_TOLERANCE,
+  MACRO_ENERGY_CONSISTENCY_TOLERANCE_PCT,
+  MACRO_ENERGY_CONSISTENCY_ABSOLUTE_KCAL,
+} from '../constants/macro-ratios.js';
 import { DomainValidationError } from '../errors/index.js';
 import { MacroCalculationInput, MacroTargetResult } from '../types/index.js';
 import { roundTo } from '../utils/measurements.js';
@@ -6,11 +12,27 @@ import { roundTo } from '../utils/measurements.js';
 /**
  * Calculates deterministic macronutrient gram and calorie targets.
  *
- * Rules & Energetic Densities (Atwater Factors):
+ * Energetic Densities (Atwater General Factors):
  * - Protein yields 4 kcal/gram.
  * - Carbohydrates yield 4 kcal/gram.
  * - Fat yields 9 kcal/gram.
- * - Fiber recommendations default to 14g per 1,000 kcal (Dietary Reference Intake).
+ *
+ * Fiber Reference Guideline:
+ * - Reference guideline derived from the Institute of Medicine (IOM) Dietary Reference
+ *   Intakes and Dietary Guidelines for Americans: 14g fiber per 1,000 kcal.
+ * - This baseline is an unprescriptive public health reference guideline, not an individual
+ *   medical or clinical prescription.
+ * - No artificial minimum floor (e.g. 15g) is imposed; low-calorie and high-calorie targets
+ *   scale proportionally. Configurable via `customFiberGrams`.
+ *
+ * Custom Macro Energy Consistency Policy:
+ * - Macro-derived energy is explicitly calculated using Atwater factors: (P * 4 + C * 4 + F * 9).
+ * - Both `dailyCalories` (user's budget target) and `macroDerivedCalories` (sum of macro energy)
+ *   are preserved transparently in the returned model.
+ * - Macro grams and calorie targets are NEVER silently altered.
+ * - If macro energy deviates from the daily calorie target beyond the documented consistency threshold
+ *   (> 5.0% variance and > 100 kcal difference), `isEnergyConsistent` is flagged as false and an
+ *   informative warning is populated.
  *
  * Rounding Specification:
  * - Macronutrient grams and fiber are rounded to 1 decimal place (`roundTo(val, 1)`).
@@ -26,6 +48,7 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
     customProteinGrams,
     customCarbsGrams,
     customFatGrams,
+    customFiberGrams,
   } = input;
 
   if (!Number.isFinite(dailyCalories) || dailyCalories <= 0) {
@@ -33,6 +56,21 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
       `Daily calories must be a positive finite number (received: ${dailyCalories}).`,
     );
   }
+
+  // Validate custom fiber if provided
+  if (customFiberGrams !== undefined) {
+    if (!Number.isFinite(customFiberGrams) || customFiberGrams < 0) {
+      throw new DomainValidationError(
+        `Custom fiber grams must be a non-negative finite number (received: ${customFiberGrams}).`,
+      );
+    }
+  }
+
+  // Resolve fiber target: custom override if present, else 14g / 1000 kcal reference guideline
+  const fiberGrams =
+    customFiberGrams !== undefined
+      ? roundTo(customFiberGrams, 1)
+      : roundTo((dailyCalories / 1000) * FIBER_GRAMS_PER_1000_KCAL, 1);
 
   // Check for partial custom macro inputs
   const customProvided = [customProteinGrams, customCarbsGrams, customFatGrams].filter(
@@ -66,16 +104,34 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
     const proteinCalories = roundTo(customProteinGrams * ATWATER_FACTORS.PROTEIN, 0);
     const carbsCalories = roundTo(customCarbsGrams * ATWATER_FACTORS.CARBOHYDRATE, 0);
     const fatCalories = roundTo(customFatGrams * ATWATER_FACTORS.FAT, 0);
-    const totalMacroCalories = proteinCalories + carbsCalories + fatCalories;
+    const macroDerivedCalories = proteinCalories + carbsCalories + fatCalories;
 
     const proteinPct =
-      totalMacroCalories > 0 ? roundTo(proteinCalories / totalMacroCalories, 3) : 0;
-    const carbsPct = totalMacroCalories > 0 ? roundTo(carbsCalories / totalMacroCalories, 3) : 0;
-    const fatPct = totalMacroCalories > 0 ? roundTo(fatCalories / totalMacroCalories, 3) : 0;
-    const fiberGrams = Math.max(roundTo((dailyCalories / 1000) * FIBER_GRAMS_PER_1000_KCAL, 1), 15);
+      macroDerivedCalories > 0 ? roundTo(proteinCalories / macroDerivedCalories, 3) : 0;
+    const carbsPct =
+      macroDerivedCalories > 0 ? roundTo(carbsCalories / macroDerivedCalories, 3) : 0;
+    const fatPct = macroDerivedCalories > 0 ? roundTo(fatCalories / macroDerivedCalories, 3) : 0;
+
+    const calorieDelta = macroDerivedCalories - dailyCalories;
+    const calorieVariancePercentage = roundTo((Math.abs(calorieDelta) / dailyCalories) * 100, 1);
+    const isEnergyConsistent =
+      Math.abs(calorieDelta) <= MACRO_ENERGY_CONSISTENCY_ABSOLUTE_KCAL ||
+      calorieVariancePercentage <= MACRO_ENERGY_CONSISTENCY_TOLERANCE_PCT;
+
+    const warnings: string[] = [];
+    if (!isEnergyConsistent) {
+      warnings.push(
+        `Custom macronutrient amounts yield ${macroDerivedCalories} kcal (${proteinCalories}P + ${carbsCalories}C + ${fatCalories}F), which deviates from your requested daily target of ${dailyCalories} kcal by ${calorieDelta > 0 ? '+' : ''}${calorieDelta} kcal (${calorieVariancePercentage}%).`,
+      );
+    }
 
     return {
       dailyCalories,
+      macroDerivedCalories,
+      calorieDelta,
+      calorieVariancePercentage,
+      isEnergyConsistent,
+      warnings,
       proteinGrams: roundTo(customProteinGrams, 1),
       carbsGrams: roundTo(customCarbsGrams, 1),
       fatGrams: roundTo(customFatGrams, 1),
@@ -109,23 +165,32 @@ export function calculateMacronutrients(input: MacroCalculationInput): MacroTarg
   }
 
   const sumOfPercentages = proteinPercentage + carbsPercentage + fatPercentage;
-  if (Math.abs(sumOfPercentages - 1.0) > 0.015) {
+  if (Math.abs(sumOfPercentages - 1.0) > MACRO_PERCENTAGE_TOLERANCE) {
     throw new DomainValidationError(
-      `Macronutrient percentages must sum to 100% (1.0). Current sum: ${roundTo(sumOfPercentages * 100, 1)}%`,
+      `Macronutrient percentages must sum to 100% (1.0). Current sum: ${roundTo(sumOfPercentages * 100, 2)}% (tolerance: ${MACRO_PERCENTAGE_TOLERANCE * 100}%).`,
     );
   }
 
   const proteinCalories = roundTo(dailyCalories * proteinPercentage, 0);
   const carbsCalories = roundTo(dailyCalories * carbsPercentage, 0);
   const fatCalories = roundTo(dailyCalories * fatPercentage, 0);
+  const macroDerivedCalories = proteinCalories + carbsCalories + fatCalories;
 
   const proteinGrams = roundTo(proteinCalories / ATWATER_FACTORS.PROTEIN, 1);
   const carbsGrams = roundTo(carbsCalories / ATWATER_FACTORS.CARBOHYDRATE, 1);
   const fatGrams = roundTo(fatCalories / ATWATER_FACTORS.FAT, 1);
-  const fiberGrams = Math.max(roundTo((dailyCalories / 1000) * FIBER_GRAMS_PER_1000_KCAL, 1), 15);
+
+  const calorieDelta = macroDerivedCalories - dailyCalories;
+  const calorieVariancePercentage = roundTo((Math.abs(calorieDelta) / dailyCalories) * 100, 1);
+  const isEnergyConsistent = true; // In percentage distribution, calories are directly scaled from dailyCalories
 
   return {
     dailyCalories,
+    macroDerivedCalories,
+    calorieDelta,
+    calorieVariancePercentage,
+    isEnergyConsistent,
+    warnings: [],
     proteinGrams,
     carbsGrams,
     fatGrams,

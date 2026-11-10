@@ -64,8 +64,20 @@ export function isValidIsoDate(isoDateString: string): boolean {
 }
 
 /**
+ * Maximum physiologically supported age in years for nutritional and metabolic calculations.
+ * Documented boundary: 120 years (human supercentenarian threshold).
+ * Consistent across calculateAgeFromDob, calculateBmr, and OnboardingDataSchema.
+ */
+export const MAXIMUM_SUPPORTED_AGE_YEARS = 120;
+
+/**
  * Derives age in whole completed years from Date of Birth against a UTC reference date.
  * Does not rely on untrusted client-supplied age values.
+ *
+ * Age Boundary Policy:
+ * - Minimum age: 0 (born on reference date)
+ * - Maximum age: 120 years (MAXIMUM_SUPPORTED_AGE_YEARS)
+ * - Dates in the future or ages exceeding 120 years throw DomainValidationError.
  */
 export function calculateAgeFromDob(dobString: string, referenceDate: Date = new Date()): number {
   const birthDate = parseIsoDate(dobString);
@@ -87,9 +99,9 @@ export function calculateAgeFromDob(dobString: string, referenceDate: Date = new
     age--;
   }
 
-  if (age < 0 || age > 130) {
+  if (age < 0 || age > MAXIMUM_SUPPORTED_AGE_YEARS) {
     throw new DomainValidationError(
-      `Derived age (${age} years) is outside plausible physiological boundaries.`,
+      `Derived age (${age} years) is outside plausible physiological boundaries (0-${MAXIMUM_SUPPORTED_AGE_YEARS} years).`,
     );
   }
 

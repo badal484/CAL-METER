@@ -123,5 +123,51 @@ describe('Nutrient Aggregation', () => {
         aggregateNutrients([{ ...validProfile, micronutrients: { zincMg: Infinity } }]),
       ).toThrow(DomainValidationError);
     });
+
+    describe('Aggregation Overflow Prevention', () => {
+      const massiveNumber = 1.5e308; // Individually finite, but addition will overflow to Infinity
+
+      it('rejects accumulated calorie overflow from individually finite values', () => {
+        const item1: NutrientProfile = { ...validProfile, calories: massiveNumber };
+        const item2: NutrientProfile = { ...validProfile, calories: massiveNumber };
+        expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
+      });
+
+      it('rejects accumulated protein overflow', () => {
+        const item1: NutrientProfile = { ...validProfile, proteinGrams: massiveNumber };
+        const item2: NutrientProfile = { ...validProfile, proteinGrams: massiveNumber };
+        expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
+      });
+
+      it('rejects accumulated carbohydrate overflow', () => {
+        const item1: NutrientProfile = { ...validProfile, carbsGrams: massiveNumber };
+        const item2: NutrientProfile = { ...validProfile, carbsGrams: massiveNumber };
+        expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
+      });
+
+      it('rejects accumulated fat overflow', () => {
+        const item1: NutrientProfile = { ...validProfile, fatGrams: massiveNumber };
+        const item2: NutrientProfile = { ...validProfile, fatGrams: massiveNumber };
+        expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
+      });
+
+      it('rejects accumulated fiber overflow', () => {
+        const item1: NutrientProfile = { ...validProfile, fiberGrams: massiveNumber };
+        const item2: NutrientProfile = { ...validProfile, fiberGrams: massiveNumber };
+        expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
+      });
+
+      it('rejects accumulated micronutrient overflow', () => {
+        const item1: NutrientProfile = {
+          ...validProfile,
+          micronutrients: { calciumMg: massiveNumber },
+        };
+        const item2: NutrientProfile = {
+          ...validProfile,
+          micronutrients: { calciumMg: massiveNumber },
+        };
+        expect(() => aggregateNutrients([item1, item2])).toThrow(DomainValidationError);
+      });
+    });
   });
 });

@@ -89,10 +89,16 @@ export interface MacroCalculationInput {
   customProteinGrams?: number;
   customCarbsGrams?: number;
   customFatGrams?: number;
+  customFiberGrams?: number;
 }
 
 export interface MacroTargetResult {
-  dailyCalories: number;
+  dailyCalories: number; // Requested daily calorie target
+  macroDerivedCalories: number; // Exact energy calculated from macronutrients via Atwater factors (4/4/9)
+  calorieDelta: number; // macroDerivedCalories - dailyCalories
+  calorieVariancePercentage: number; // |calorieDelta| / dailyCalories * 100
+  isEnergyConsistent: boolean; // true if within documented energy tolerance threshold
+  warnings: string[]; // explicit warnings if macro energy deviates from requested calorie target
   proteinGrams: number;
   carbsGrams: number;
   fatGrams: number;
@@ -130,6 +136,7 @@ export type ServingConversionResult =
         | 'UNSUPPORTED_UNIT_FOR_FOOD'
         | 'INVALID_QUANTITY'
         | 'INVALID_CONVERSION_FACTOR'
+        | 'CONVERSION_OVERFLOW'
         | 'MISSING_FOOD_CONVERSION';
       message: string;
     };

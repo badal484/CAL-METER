@@ -112,20 +112,32 @@ describe('Contracts Runtime Schema Validation', () => {
       ).toBe(false);
     });
 
-    it('rejects date of birth in the future or age exceeding 120 years', () => {
+    it('handles exact age boundary of 120 years and rejects one year beyond (121 years)', () => {
+      // Current year is 2026. A DOB in 1906 yields age 120 (valid boundary)
+      const exactBoundary = OnboardingDataSchema.safeParse({
+        ...validOnboarding,
+        dob: '1906-11-10',
+      });
+      expect(exactBoundary.success).toBe(true);
+
+      // A DOB in 1905 yields age 121 (exceeds MAXIMUM_SUPPORTED_AGE_YEARS)
+      const beyondBoundary = OnboardingDataSchema.safeParse({
+        ...validOnboarding,
+        dob: '1905-11-10',
+      });
+      expect(beyondBoundary.success).toBe(false);
+      if (!beyondBoundary.success) {
+        expect(beyondBoundary.error.issues[0]?.path).toContain('dob');
+      }
+    });
+
+    it('rejects date of birth in the future', () => {
       // Future date
       const futureParsed = OnboardingDataSchema.safeParse({
         ...validOnboarding,
         dob: '2030-01-01',
       });
       expect(futureParsed.success).toBe(false);
-
-      // Unrealistic age (> 120)
-      const ancientParsed = OnboardingDataSchema.safeParse({
-        ...validOnboarding,
-        dob: '1890-01-01',
-      });
-      expect(ancientParsed.success).toBe(false);
     });
   });
 

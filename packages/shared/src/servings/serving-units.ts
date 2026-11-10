@@ -47,9 +47,17 @@ export function convertServingToGrams(
 
   // Metric base units
   if (normalizedUnit === 'g' || normalizedUnit === 'gram' || normalizedUnit === 'grams') {
+    const rounded = roundTo(quantity, 1);
+    if (!Number.isFinite(rounded)) {
+      return {
+        success: false,
+        error: 'CONVERSION_OVERFLOW',
+        message: `Serving quantity in grams resulted in non-finite value.`,
+      };
+    }
     return {
       success: true,
-      gramWeight: roundTo(quantity, 1),
+      gramWeight: rounded,
       unit: 'gram',
       quantity,
       provenance: ServingProvenance.USER_CONFIGURED,
@@ -75,7 +83,23 @@ export function convertServingToGrams(
     };
   }
 
-  const totalGrams = roundTo(quantity * match.gramWeight, 1);
+  const rawGrams = quantity * match.gramWeight;
+  if (!Number.isFinite(rawGrams)) {
+    return {
+      success: false,
+      error: 'CONVERSION_OVERFLOW',
+      message: `Serving conversion resulted in numeric overflow for unit "${unit}" (result: ${rawGrams}).`,
+    };
+  }
+
+  const totalGrams = roundTo(rawGrams, 1);
+  if (!Number.isFinite(totalGrams)) {
+    return {
+      success: false,
+      error: 'CONVERSION_OVERFLOW',
+      message: `Serving conversion resulted in numeric overflow for unit "${unit}" after rounding.`,
+    };
+  }
 
   return {
     success: true,
@@ -107,11 +131,19 @@ export function convertGramsToServing(
   const normalizedUnit = targetUnit.trim().toLowerCase();
 
   if (normalizedUnit === 'g' || normalizedUnit === 'gram' || normalizedUnit === 'grams') {
+    const rounded = roundTo(targetGrams, 1);
+    if (!Number.isFinite(rounded)) {
+      return {
+        success: false,
+        error: 'CONVERSION_OVERFLOW',
+        message: `Target grams resulted in non-finite value.`,
+      };
+    }
     return {
       success: true,
-      gramWeight: roundTo(targetGrams, 1),
+      gramWeight: rounded,
       unit: 'gram',
-      quantity: roundTo(targetGrams, 1),
+      quantity: rounded,
       provenance: ServingProvenance.USER_CONFIGURED,
     };
   }
@@ -134,7 +166,23 @@ export function convertGramsToServing(
     };
   }
 
-  const quantity = roundTo(targetGrams / match.gramWeight, 2);
+  const rawQuantity = targetGrams / match.gramWeight;
+  if (!Number.isFinite(rawQuantity)) {
+    return {
+      success: false,
+      error: 'CONVERSION_OVERFLOW',
+      message: `Gram to serving conversion resulted in numeric overflow for unit "${targetUnit}" (result: ${rawQuantity}).`,
+    };
+  }
+
+  const quantity = roundTo(rawQuantity, 2);
+  if (!Number.isFinite(quantity)) {
+    return {
+      success: false,
+      error: 'CONVERSION_OVERFLOW',
+      message: `Gram to serving conversion resulted in numeric overflow for unit "${targetUnit}" after rounding.`,
+    };
+  }
 
   return {
     success: true,
