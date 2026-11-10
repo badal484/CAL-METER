@@ -10,6 +10,8 @@ import { createOnboardingRouter } from './onboarding.routes.js';
 import { createGoalRouter } from './goal.routes.js';
 import { createTrackingRouter } from './tracking.routes.js';
 import { createCoachRouter } from './coach.routes.js';
+import { createSubscriptionRouter } from './subscription.routes.js';
+import { createWebhookRouter } from './webhook.routes.js';
 import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 import type { BarcodeLookupService } from '../services/barcode/barcodeLookup.service.js';
 
@@ -19,6 +21,8 @@ export interface RouteOptions {
   foodRouter?: Router;
   barcodeService?: BarcodeLookupService;
   coachRouter?: Router;
+  subscriptionRouter?: Router;
+  webhookRouter?: Router;
 }
 
 export function createRootRouter(options?: RouteOptions): Router {
@@ -67,6 +71,15 @@ export function createRootRouter(options?: RouteOptions): Router {
     '/coach',
     options?.coachRouter ||
       createCoachRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/subscriptions',
+    options?.subscriptionRouter ||
+      createSubscriptionRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/webhooks',
+    options?.webhookRouter || createWebhookRouter({ prisma: options?.prisma }),
   );
 
   rootRouter.use('/api/v1', v1Router);

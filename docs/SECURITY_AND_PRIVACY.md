@@ -307,3 +307,57 @@ CAL METER adheres to strict privacy-by-design principles regarding mobile camera
 - Users retain full sovereignty over their coach conversation records:
   - Self-service history deletion (`DELETE /api/v1/coach/history`) instantly purges all user and assistant messages for that account.
   - Account deletion cascade: Removing an account automatically deletes all associated `coach_messages` and `coach_insights` via PostgreSQL foreign-key cascade (`onDelete: Cascade`).
+
+---
+
+## 10. Subscription Security, In-App Purchase Verification & Webhook Governance
+
+### 10.1. Zero Client Trust for Premium Entitlements
+
+- **Principle of Authoritative Backend Verification:**
+  - Client applications (`@calmeter/mobile`) are treated as untrusted presentation environments.
+  - Client-reported subscription status, local cached flags, or boolean parameters (e.g. `isPremium: true`) sent in HTTP payloads are strictly rejected for authorization decisions.
+  - Every protected API operation (such as high-volume AI scans, advanced micronutrient breakdowns, or extended historical log queries) verifies the user's effective entitlement tier directly from trusted PostgreSQL database state (`subscriptions` and `user_feature_usage` tables).
+
+### 10.2. Server-to-Server Webhook Authentication & Token Verification
+
+- **Secure Webhook Verification:**
+  - Real-time subscription lifecycle updates arrive exclusively through server-to-server HTTP POST requests dispatched by RevenueCat to `/api/v1/webhooks/revenuecat`.
+  - The webhook handler strictly validates the incoming `Authorization: Bearer <token>` header against `REVENUECAT_WEBHOOK_AUTH_TOKEN`.
+  - Requests with missing or mismatched authorization tokens are immediately rejected with `401 Unauthorized` (`AUTH_UNAUTHORIZED`).
+  - Production deployments require strong 256-bit cryptographically random tokens stored in protected environment secrets.
+
+### 10.3. Idempotency, Replay Protection & Out-of-Order Safety
+
+- **Deduplication via Unique Event Indexing:**
+  - All webhook payloads contain an immutable `event.id`.
+  - Every incoming event is logged into the `revenuecat_webhook_events` table with a unique constraint on `event_id`.
+  - Duplicate deliveries (common during network retries) are recognized via database conflict handling, returning `200 OK` with status `IGNORED_DUPLICATE` without duplicating state updates or database records.
+- **Out-of-Order Safety via Event Timestamps:**
+  - Mobile app stores occasionally deliver webhook events out of sequence (e.g. an older cancellation notification arriving after a newer renewal).
+  - CAL METER tracks `last_event_timestamp` on the `subscriptions` table. If an incoming event has `event_timestamp_ms <= lastEventTimestamp`, it is audited as `IGNORED_OUT_OF_ORDER` without regressing the user's active subscription status.
+
+### 10.4. Entitlement Continuity & Grace Period Invariants
+
+- **Non-Revocation on Auto-Renew Cancellation:**
+  - When a user cancels auto-renewal in Apple or Google store settings (`CANCELLATION` event), their paid access is NOT revoked immediately.
+  - The subscription record transitions to `status: CANCELED` with `auto_renew_status = false`, but effective tier remains `SubscriptionTier.PREMIUM` until `expiresAt` passes.
+- **Billing Issue Grace Period:**
+  - If a recurring payment fails (`BILLING_ISSUE` event), the timestamp is recorded (`billing_issue_detected_at`), providing store-defined grace period windows before account downgrade.
+
+### 10.5. Atomic Quota Enforcement & Concurrency Defenses
+
+- **Race-Condition-Free Counters:**
+  - Free daily feature limits (3 AI scans, 10 barcodes, 2 label scans, 5 coach messages) are tracked atomically in `user_feature_usage` with a composite unique key `(user_id, feature, date)`.
+  - All usage increments execute atomic PostgreSQL `UPSERT` queries with `count: { increment: 1 }`, guaranteeing exact counter consistency under concurrent parallel requests.
+
+### 10.6. App Store Guideline Compliance & Zero Dark Patterns
+
+- **Apple App Store Guideline 3.1.1 (In-App Purchases):**
+  - All digital subscriptions are processed strictly via official Store In-App Purchases (RevenueCat SDK).
+  - Prominent, functional "Restore Purchases" button is accessible on both the Paywall and the User Profile.
+- **Zero Deceptive Urgency Patterns:**
+  - The paywall design system uses strict monochrome typography and cards.
+  - Fake countdown timers, artificial scarcity claims, pre-checked deceptive options, or hidden renewal charges are strictly prohibited in the CAL METER client codebase.
+- **Apple Guideline 5.1.1(v) (Account Deletion & Subscription Unlinking):**
+  - When an account deletion is requested, the internal subscription row is deleted via cascading foreign key, while audit webhook logs have `user_id` safely nullified (`onDelete: SetNull`) to maintain regulatory accounting records.

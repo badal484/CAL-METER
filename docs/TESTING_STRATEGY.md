@@ -274,3 +274,63 @@ Part 11 establishes complete test coverage across shared formulas, contracts, ba
 - **Deterministic Insights Tab:** Validates switching to the Insights tab fetches and displays metric cards with progress bars and tips.
 - **Meal Ideas Tab:** Validates switching to the Meal Ideas tab displays remaining budget, meal cards, and "Log This Meal" confirmation.
 - **Error & Retry Handling:** Verifies network failures trigger `ErrorState` with retry pathways.
+
+---
+
+## 9. Subscriptions, Payments & Premium Entitlements Test Suites (Part 12)
+
+Part 12 implements end-to-end testing across shared entitlement formulas, contract schemas, backend webhook and status APIs, and mobile UI/hooks:
+
+### 9.1. Shared Formulas & Entitlements (`packages/shared/tests/subscriptions.test.ts`)
+
+- **Effective Tier Calculation:**
+  - Active subscription (`ACTIVE` / `TRIAL`) resolves to `PREMIUM`.
+  - Active subscription past `expiresAt` resolves to `FREE`.
+  - Cancelled subscription (`CANCELED`) with future `expiresAt` remains entitled to `PREMIUM`.
+  - Cancelled subscription past `expiresAt` resolves to `FREE`.
+  - Expired, past-due, or null subscription resolves to `FREE`.
+- **Feature Policy Evaluation:**
+  - Evaluates daily quotas for `AI_PHOTO_SCAN`, `BARCODE_SCAN`, `COACH_CHAT`, and `MEAL_RECOMMENDATIONS`.
+  - Enforces `ADVANCED_ANALYTICS` premium-only restriction.
+  - Enforces 30-day history limit for free users while granting unlimited access to premium subscribers.
+
+### 9.2. Contract Validation (`packages/contracts/tests/contracts.test.ts`)
+
+- **Subscription Status Schemas:** Validates `SubscriptionStatusResponseSchema` and `SyncSubscriptionRequestSchema`.
+- **Feature Access Schemas:** Validates `FeatureCheckQuerySchema` and `FeatureAccessResponseSchema`.
+- **RevenueCat Webhook Schemas:** Validates `RevenueCatWebhookPayloadSchema` with nested event attributes and store types.
+
+### 9.3. Backend Integration & Webhook Engine (`apps/api/tests/subscriptions.test.ts`)
+
+- **Webhook Authentication:**
+  - Rejects webhook requests missing the `Authorization` header (`401 Unauthorized`).
+  - Rejects webhook requests with invalid bearer credentials (`401 Unauthorized`).
+  - Accepts authentic webhooks matching `REVENUECAT_WEBHOOK_AUTH_TOKEN` (`200 OK`).
+- **Lifecycle Event Processing:**
+  - `INITIAL_PURCHASE`: Creates active premium subscription record.
+  - `RENEWAL`: Updates latest purchase date and extends expiration timestamp.
+  - `CANCELLATION`: Sets status to `CANCELED` and `autoRenewStatus = false`, but preserves `PREMIUM` entitlement until `expiresAt`.
+  - `EXPIRATION`: Sets status to `EXPIRED` and revokes tier to `FREE`.
+  - `BILLING_ISSUE`: Sets `billingIssueDetectedAt` for store grace period processing.
+- **Idempotency & Replay Defense:**
+  - Re-sending an identical `event_id` returns `200 OK` with status `IGNORED_DUPLICATE` without duplicating database writes.
+- **Out-of-Order Event Protection:**
+  - Deliberately dispatching an older event after a newer event returns `200 OK` with status `IGNORED_OUT_OF_ORDER` without regressing the user's active state.
+- **Subscription Status & Multi-Tenant Isolation:**
+  - User A cannot observe, query, or sync User B's subscription record.
+- **Atomic Usage Increment Concurrency:**
+  - 10 parallel atomic increments executed concurrently on `(userId, feature, date)` execute without race condition lost updates.
+
+### 9.4. Mobile UI & Hook Tests (`apps/mobile/tests/subscription.test.tsx`)
+
+- **`useEntitlements` Hook:**
+  - Evaluates free tier quotas and blocks access when limits are exceeded.
+  - Evaluates premium tier status with unlimited feature access.
+  - Returns remaining daily quota numbers.
+- **`FeatureLimitModal` Component:**
+  - Displays feature title, explanation of daily free limit, "Upgrade to Premium" button, and "Maybe Later" dismiss button.
+- **`PaywallScreen` Component:**
+  - Renders title, subtitle, localized offerings, toggle between Monthly and Annual plans, feature comparison table, purchase triggers, and store disclosures.
+- **`ManageSubscriptionView` Component:**
+  - Renders Free Plan badge and upgrade CTA for free users.
+  - Renders Premium badge and renewal date for active subscribers.

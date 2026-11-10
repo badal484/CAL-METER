@@ -214,10 +214,27 @@ flowchart TD
 
 ### 5.7. Subscription & Monetization (Feature 20)
 
-- **FR-20.1:** RevenueCat SDK integration for cross-platform App Store and Google Play billing.
-- **FR-20.2:** Free Tier Limits: 3 AI photo scans per day, unlimited manual search and barcode scanning, 7-day diary history.
-- **FR-20.3:** Premium Tier ("CAL METER Pro"): Unlimited AI photo scans, unlimited history, detailed micronutrient breakdown, export data to CSV/PDF.
-- **FR-20.4:** Server-side entitlement validation: Client-side receipt checks are never trusted alone; backend verifies active entitlements via RevenueCat REST API before dispatching vision jobs.
+- **FR-20.1 (Architecture & Stores):** RevenueCat SDK and server-to-server webhook integration for cross-platform billing on Apple App Store (In-App Purchases) and Google Play Billing.
+- **FR-20.2 (Feature & Quota Matrix):**
+  - **AI Food Photo Scans:** 3 scans/day (Free) vs 50 scans/day (Premium).
+  - **Barcode & Packaged Food Lookups:** 10 lookups/day (Free) vs Unlimited (Premium).
+  - **Nutrition Label OCR Scanning:** 2 scans/day (Free) vs Unlimited (Premium).
+  - **AI Nutrition Coach Messages:** 5 messages/day (Free) vs Unlimited (Premium).
+  - **Meal Recommendations:** 2 recommendations/day (Free) vs Unlimited (Premium).
+  - **Diary History Range:** Up to 30 days (Free) vs Unlimited All-Time History (Premium).
+  - **Advanced Analytics & Micronutrients:** Basic macronutrient dashboard (Free) vs Complete Micronutrient & Metabolic Trend Suite (Premium).
+- **FR-20.3 (Authoritative Backend Verification):** Zero client trust. Entitlements are evaluated exclusively from PostgreSQL database state updated via authenticated webhooks. Client-reported `isPremium` booleans are never trusted for authorization.
+- **FR-20.4 (Lifecycle & Cancellation Invariants):**
+  - When auto-renew is cancelled (`CANCELLATION` event), premium access remains entitled until the billing cycle expires (`expiresAt`).
+  - Webhooks enforce out-of-order event protection using monotonic `event_timestamp_ms` checks against `lastEventTimestamp`.
+  - Duplicate events are deduplicated idempotently via unique `eventId` indexing.
+- **FR-20.5 (Pricing & Regional Offerings):**
+  - Monthly: $9.99 / month (or localized equivalent, e.g. ₹499 in India).
+  - Annual: $79.99 / year (or localized equivalent, e.g. ₹3,999 in India) with a "Save 33%" discount.
+- **FR-20.6 (Transparent Monochrome Paywall):**
+  - Strictly monochrome styling conforming to CAL METER's minimal design system (pure black, white, gray).
+  - Zero deceptive patterns: No fake countdown timers, no artificial scarcity, no hidden recurring fees.
+  - Transparent Free vs Premium comparison table, 1-tap "Restore Purchases" button, and prominent store cancellation disclosures.
 
 ### 5.8. Account Management, Privacy & Security (Feature 22)
 

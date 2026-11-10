@@ -24,6 +24,8 @@ const envSchema = z
     FIREBASE_CLIENT_EMAIL: z.string().optional(),
     FIREBASE_PRIVATE_KEY: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+    REVENUECAT_WEBHOOK_AUTH_TOKEN: z.string().optional(),
+    REVENUECAT_SECRET_KEY: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     // In production, credential mode must be explicitly chosen

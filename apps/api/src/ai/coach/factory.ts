@@ -24,4 +24,3 @@ export function getCoachAiProvider(): ICoachAiProvider {
 export function setCoachAiProvider(provider: ICoachAiProvider | null): void {
   activeCoachProvider = provider;
 }
-

@@ -109,6 +109,37 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStore {
+  APP_STORE
+  PLAY_STORE
+  STRIPE
+  PROMOTIONAL
+  UNKNOWN
+}
+
+enum WebhookEventStatus {
+  PROCESSED
+  IGNORED_DUPLICATE
+  IGNORED_OUT_OF_ORDER
+  FAILED
+}
+
+enum FeatureKey {
+  AI_PHOTO_SCAN
+  BARCODE_SCAN
+  NUTRITION_LABEL_SCAN
+  COACH_CHAT
+  PERSONALIZED_INSIGHTS
+  HISTORY_RANGE
+  MEAL_RECOMMENDATIONS
+  ADVANCED_ANALYTICS
+}
+
 enum ImportStatus {
   PENDING
   RUNNING
@@ -189,6 +220,8 @@ model User {
   coachMessages CoachMessage[]
   coachInsights CoachInsight[]
   subscription Subscription?
+  webhookEvents RevenueCatWebhookEvent[]
+  featureUsages UserFeatureUsage[]
   customFoods  FoodItem[]        @relation("UserCustomFoods")
   deletionReq  DeletionRequest?
 
@@ -603,19 +636,71 @@ model ExerciseLog {
 }
 
 model Subscription {
-  id                  String             @id @default(uuid()) @db.Uuid
-  userId              String             @unique @map("user_id") @db.Uuid
-  revenueCatAppUserId String             @unique @map("rc_app_user_id")
-  status              SubscriptionStatus @default(FREE)
-  planId              String?            @map("plan_id")
-  expiresAt           DateTime?          @map("expires_at")
-  cancelReason        String?            @map("cancel_reason")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
+  id                     String              @id @default(uuid()) @db.Uuid
+  userId                 String              @unique @map("user_id") @db.Uuid
+  revenueCatAppUserId    String              @unique @map("rc_app_user_id")
+  tier                   SubscriptionTier    @default(FREE)
+  status                 SubscriptionStatus  @default(FREE)
+  store                  SubscriptionStore   @default(UNKNOWN)
+  planId                 String?             @map("plan_id")
+  productId              String?             @map("product_id")
+  entitlementId          String?             @default("premium_access") @map("entitlement_id")
+  originalPurchaseDate   DateTime?           @map("original_purchase_date")
+  latestPurchaseDate     DateTime?           @map("latest_purchase_date")
+  expiresAt              DateTime?           @map("expires_at")
+  autoRenewStatus        Boolean             @default(false) @map("auto_renew_status")
+  isSandbox              Boolean             @default(false) @map("is_sandbox")
+  billingIssueDetectedAt DateTime?           @map("billing_issue_detected_at")
+  cancelReason           String?             @map("cancel_reason")
+  lastEventTimestamp     DateTime?           @map("last_event_timestamp")
+  rawPayload             Json?               @map("raw_payload") @db.JsonB
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
 
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, status])
+  @@index([userId, tier])
   @@map("subscriptions")
+}
+
+model RevenueCatWebhookEvent {
+  id             String             @id @default(uuid()) @db.Uuid
+  eventId        String             @unique @map("event_id") @db.VarChar(128)
+  eventType      String             @map("event_type") @db.VarChar(64)
+  appUserId      String             @map("app_user_id") @db.VarChar(128)
+  userId         String?            @map("user_id") @db.Uuid
+  productId      String?            @map("product_id") @db.VarChar(128)
+  periodType     String?            @map("period_type") @db.VarChar(32)
+  eventTimestamp DateTime           @map("event_timestamp")
+  status         WebhookEventStatus @default(PROCESSED)
+  errorMessage   String?            @map("error_message") @db.Text
+  rawPayload     Json               @map("raw_payload") @db.JsonB
+  processedAt    DateTime           @default(now()) @map("processed_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  user           User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([appUserId])
+  @@index([userId])
+  @@index([eventType])
+  @@index([eventTimestamp(sort: Desc)])
+  @@map("revenuecat_webhook_events")
+}
+
+model UserFeatureUsage {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @map("user_id") @db.Uuid
+  feature   FeatureKey
+  date      DateTime   @default(now()) @map("date") @db.Date
+  count     Int        @default(0)
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, date])
+  @@index([userId, date])
+  @@map("user_feature_usage")
 }
 
 model DeletionRequest {

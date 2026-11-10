@@ -16,6 +16,7 @@ export * from './formulas/targets.js';
 export * from './formulas/macros.js';
 export * from './formulas/exercise.js';
 export * from './formulas/insights.js';
+export * from './formulas/entitlements.js';
 export * from './formulas/nutrition-scaling.js';
 export * from './formulas/nutrient-aggregation.js';
 

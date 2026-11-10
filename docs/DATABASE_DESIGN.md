@@ -23,6 +23,8 @@ erDiagram
     User ||--o{ CoachMessage : "converses"
     User ||--o{ CoachInsight : "receives"
     User ||--o| Subscription : "holds"
+    User ||--o{ RevenueCatWebhookEvent : "receives events"
+    User ||--o{ UserFeatureUsage : "tracks daily usage"
     User ||--o{ FoodItem : "creates (custom)"
 
     MealEntry ||--o{ MealFoodItem : "contains"
@@ -251,11 +253,46 @@ erDiagram
     Subscription {
         uuid id PK
         uuid userId FK,UK
-        string revenueCatAppUserId
+        string revenueCatAppUserId UK
+        enum tier
         enum status
+        enum store
         string planId
+        string productId
+        string entitlementId
+        datetime originalPurchaseDate
+        datetime latestPurchaseDate
         datetime expiresAt
+        boolean autoRenewStatus
+        boolean isSandbox
+        datetime billingIssueDetectedAt
+        datetime lastEventTimestamp
         string cancelReason
+        jsonb rawPayload
+    }
+
+    RevenueCatWebhookEvent {
+        uuid id PK
+        string eventId UK
+        string eventType
+        string appUserId
+        uuid userId FK
+        string productId
+        string periodType
+        datetime eventTimestamp
+        enum status
+        jsonb rawPayload
+        datetime createdAt
+    }
+
+    UserFeatureUsage {
+        uuid id PK
+        uuid userId FK
+        enum feature
+        date date
+        int count
+        datetime createdAt
+        datetime updatedAt
     }
 
     WeightLog {
@@ -425,6 +462,37 @@ enum SubscriptionStatus {
   PAST_DUE
   CANCELED
   EXPIRED
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStore {
+  APP_STORE
+  PLAY_STORE
+  STRIPE
+  PROMOTIONAL
+  UNKNOWN
+}
+
+enum WebhookEventStatus {
+  PROCESSED
+  IGNORED_DUPLICATE
+  IGNORED_OUT_OF_ORDER
+  FAILED
+}
+
+enum FeatureKey {
+  AI_PHOTO_SCAN
+  BARCODE_SCAN
+  NUTRITION_LABEL_SCAN
+  COACH_CHAT
+  PERSONALIZED_INSIGHTS
+  HISTORY_RANGE
+  MEAL_RECOMMENDATIONS
+  ADVANCED_ANALYTICS
 }
 
 enum ImportStatus {
@@ -926,19 +994,70 @@ model CoachInsight {
 }
 
 model Subscription {
-  id                  String             @id @default(uuid()) @db.Uuid
-  userId              String             @unique @map("user_id") @db.Uuid
-  revenueCatAppUserId String             @unique @map("rc_app_user_id")
-  status              SubscriptionStatus @default(FREE)
-  planId              String?            @map("plan_id")
-  expiresAt           DateTime?          @map("expires_at")
-  cancelReason        String?            @map("cancel_reason")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
+  id                     String             @id @default(uuid()) @db.Uuid
+  userId                 String             @unique @map("user_id") @db.Uuid
+  revenueCatAppUserId    String             @unique @map("rc_app_user_id")
+  tier                   SubscriptionTier   @default(FREE)
+  status                 SubscriptionStatus @default(FREE)
+  store                  SubscriptionStore  @default(UNKNOWN)
+  planId                 String?            @map("plan_id")
+  productId              String?            @map("product_id")
+  entitlementId          String?            @map("entitlement_id")
+  originalPurchaseDate   DateTime?          @map("original_purchase_date")
+  latestPurchaseDate     DateTime?          @map("latest_purchase_date")
+  expiresAt              DateTime?          @map("expires_at")
+  autoRenewStatus        Boolean            @default(false) @map("auto_renew_status")
+  isSandbox              Boolean            @default(false) @map("is_sandbox")
+  billingIssueDetectedAt DateTime?          @map("billing_issue_detected_at")
+  lastEventTimestamp     DateTime?          @map("last_event_timestamp")
+  cancelReason           String?            @map("cancel_reason")
+  rawPayload             Json?              @map("raw_payload") @db.JsonB
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
 
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, status])
+  @@index([userId, tier])
   @@map("subscriptions")
+}
+
+model RevenueCatWebhookEvent {
+  id             String             @id @default(uuid()) @db.Uuid
+  eventId        String             @unique @map("event_id")
+  eventType      String             @map("event_type")
+  appUserId      String             @map("app_user_id")
+  userId         String?            @map("user_id") @db.Uuid
+  productId      String?            @map("product_id")
+  periodType     String?            @map("period_type")
+  eventTimestamp DateTime           @map("event_timestamp")
+  status         WebhookEventStatus @default(PROCESSED)
+  rawPayload     Json               @map("raw_payload") @db.JsonB
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  user           User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([appUserId])
+  @@index([userId])
+  @@index([eventType])
+  @@map("revenuecat_webhook_events")
+}
+
+model UserFeatureUsage {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @map("user_id") @db.Uuid
+  feature   FeatureKey
+  date      DateTime   @db.Date
+  count     Int        @default(0)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, date])
+  @@index([userId, date])
+  @@map("user_feature_usage")
 }
 
 model DeletionRequest {

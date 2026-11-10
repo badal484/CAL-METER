@@ -3,6 +3,7 @@ import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, Theme as NavigationTheme } from '@react-navigation/native';
 import { ThemeProvider, useTheme } from './providers/ThemeProvider';
+import { EntitlementsProvider } from '../hooks/useEntitlements';
 import { AppNavigator } from './navigation/AppNavigator';
 
 const AppContent: React.FC = () => {
@@ -52,7 +53,9 @@ export const App: React.FC = () => {
   return (
     <SafeAreaProvider>
       <ThemeProvider initialMode="system">
-        <AppContent />
+        <EntitlementsProvider>
+          <AppContent />
+        </EntitlementsProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -24,6 +24,10 @@ export default defineConfig({
         find: 'react-native-camera-kit',
         replacement: path.resolve(__dirname, './tests/mocks/react-native-camera-kit.ts'),
       },
+      {
+        find: 'react-native-purchases',
+        replacement: path.resolve(__dirname, './tests/mocks/react-native-purchases.ts'),
+      },
     ],
   },
   test: {
@@ -36,6 +40,7 @@ export default defineConfig({
           /react-native-safe-area-context/,
           /react-native-svg/,
           /react-native-camera-kit/,
+          /react-native-purchases/,
         ],
       },
     },

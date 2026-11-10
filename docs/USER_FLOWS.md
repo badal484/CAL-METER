@@ -287,29 +287,79 @@ sequenceDiagram
     actor User as User (Free Tier)
     participant Client as React Native App
     participant RC as RevenueCat SDK
+    participant Store as Apple App Store / Google Play
     participant API as Backend API
-    participant Store as Apple / Google In-App Purchase
+    participant DB as PostgreSQL Database
 
-    User->>Client: Captures 4th food photo of the day
-    Client->>API: POST /scans/presign-upload
-    API-->>Client: 429 DAILY_SCAN_LIMIT_REACHED { scansUsed: 3, limit: 3 }
-    Client->>Client: Intercepts 429 & surfaces Pro Paywall Modal
+    Note over User,Client: Scenario A: Daily Quota Limit Encountered
+    User->>Client: Captures 4th food photo (or 11th barcode, 6th coach message)
+    Client->>API: GET /subscriptions/check-access?feature=AI_PHOTO_SCAN
+    API->>DB: Query user_feature_usage (atomic count)
+    DB-->>API: count = 3, freeDailyLimit = 3
+    API-->>Client: 200 OK { allowed: false, remaining: 0, requiresUpgrade: true }
+    Client->>User: Renders FeatureLimitModal ("Daily Limit of 3 Scans Reached")
 
-    Note over Client,User: High-converting, transparent paywall
-    Client->>User: Displays "Unlock CAL METER Pro" (Unlimited Scans, Regional Precision)
-    User->>Client: Selects Annual Plan (Free 7-Day Trial)
+    User->>Client: Taps "Upgrade to Premium"
+    Client->>RC: getOfferings()
+    RC-->>Client: Offerings (Monthly: $9.99, Annual: $79.99 with "Save 33%")
+    Client->>User: Displays Monochromatic PaywallScreen (Comparison Table, Legal Disclosures)
+
+    Note over User,Client: Scenario B: Purchase Execution
+    User->>Client: Selects Annual Plan & Taps "Subscribe"
     Client->>RC: purchasePackage(annualPackage)
     RC->>Store: Launch native platform billing sheet
-    User->>Store: Confirms FaceID / Fingerprint Purchase
-    Store-->>RC: Transaction Success & Encrypted Receipt
-    RC-->>Client: Entitlement "pro" active
+    User->>Store: Confirms purchase (Biometric / Passcode)
+    Store-->>RC: Encrypted store transaction receipt
+    RC-->>Client: Purchase success & customerInfo
 
-    RC->>API: Server-to-server Webhook (INITIAL_PURCHASE)
-    API->>API: Synchronize Subscription status = ACTIVE in PostgreSQL
-    Client->>API: Re-dispatch scan upload request
-    API-->>Client: Presigned URL issued successfully
-    Client->>User: Seamlessly resumes photo scan without restarting
+    par Real-Time Server-to-Server Webhook
+        RC->>API: POST /webhooks/revenuecat (Bearer Token Auth)
+        API->>API: Validate secret, check idempotency (event_id) & timestamp
+        API->>DB: Upsert Subscription (tier: PREMIUM, status: ACTIVE, expiresAt)
+        API->>DB: Audit log in revenuecat_webhook_events (status: PROCESSED)
+        API-->>RC: 200 OK { status: "PROCESSED" }
+    and Client Entitlement Sync
+        Client->>API: POST /subscriptions/sync
+        API->>DB: Verify active subscription record
+        API-->>Client: 200 OK { tier: "PREMIUM", isActive: true }
+    end
+
+    Client->>User: Displays "Subscription Activated" & automatically unlocks 50 scans/day
+
+    Note over User,Client: Scenario C: Cancellation & Grace Period Handling
+    User->>Store: Cancels subscription auto-renewal in OS Account Settings
+    Store-->>RC: Cancellation notification
+    RC->>API: Webhook (CANCELLATION)
+    API->>DB: Update Subscription (status: CANCELED, autoRenew: false)
+    Note over API,DB: Crucial Invariant: tier remains PREMIUM until expiresAt passes!
+    User->>Client: Opens Profile / Manage Subscription
+    Client->>API: GET /subscriptions/status
+    API-->>Client: 200 OK { tier: "PREMIUM", isCanceled: true, cancelAtPeriodEnd: true, expiresAt: "2027-11-10" }
+    Client->>User: Displays "Cancelled • Access remains active until Nov 10, 2027"
 ```
+
+### Detailed Interaction States in Subscription & Entitlement Flow:
+
+1. **Pre-Flight Access Check (`GET /subscriptions/check-access`):**
+   - Seamlessly verifies if the user has remaining quota before dispatching heavy AI or camera jobs.
+   - Prevents wasting network bandwidth or presigned storage URLs when daily quota is exhausted.
+
+2. **Feature Limit Modal (`FeatureLimitModal.tsx`):**
+   - Clean, non-intrusive modal dialog explaining the specific quota reached (e.g. 3 AI scans, 10 barcodes, 5 coach messages).
+   - Shows reset schedule ("Resets tomorrow at midnight") and provides immediate 1-tap pathway to the Paywall.
+
+3. **Transparent Monochromatic Paywall (`PaywallScreen.tsx`):**
+   - Strict adherence to CAL METER's minimal design system: pure black, white, and subtle zinc gray tones.
+   - Zero dark patterns: No false scarcity timers, no misleading discounts, no hidden subscription traps.
+   - Transparent Free vs Premium comparison table showing exact quotas and capabilities.
+   - Clear selector between Annual ($79.99/yr, $6.67/mo • Save 33%) and Monthly ($9.99/mo).
+   - Prominent "Restore Purchases" button for App Store Guideline 3.1.1 compliance.
+   - Full legal disclosures covering auto-renewal terms, recurring billing, and cancellation guidance.
+
+4. **Self-Service Subscription Management (`ManageSubscriptionView.tsx`):**
+   - Embedded directly in the user Profile.
+   - Free users see their tier, current quotas, and an "Upgrade" button.
+   - Premium subscribers see active plan name, renewal date, and store attribution with a 1-tap "Sync Purchases" button.
 
 ---
 

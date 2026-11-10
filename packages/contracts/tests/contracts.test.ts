@@ -1304,7 +1304,9 @@ describe('Contracts Runtime Schema Validation', () => {
     it('validates SendCoachMessageSchema constraints', async () => {
       const { SendCoachMessageSchema } = await import('../src/coach.contract.js');
 
-      expect(SendCoachMessageSchema.safeParse({ message: 'How is my protein intake today?' }).success).toBe(true);
+      expect(
+        SendCoachMessageSchema.safeParse({ message: 'How is my protein intake today?' }).success,
+      ).toBe(true);
       expect(SendCoachMessageSchema.safeParse({ message: '' }).success).toBe(false);
       expect(SendCoachMessageSchema.safeParse({ message: '   ' }).success).toBe(false);
       expect(SendCoachMessageSchema.safeParse({ message: 'a'.repeat(2001) }).success).toBe(false);
@@ -1370,6 +1372,72 @@ describe('Contracts Runtime Schema Validation', () => {
       };
 
       expect(MealRecommendationSchema.safeParse(meal).success).toBe(true);
+    });
+  });
+
+  describe('Subscriptions, Payments & Entitlements Contracts (Part 12)', () => {
+    it('validates SubscriptionStatusResponseSchema', async () => {
+      const { SubscriptionStatusResponseSchema } = await import('../src/subscription.contract.js');
+      const { SubscriptionTier, SubscriptionStatus, SubscriptionStore, FeatureKey } =
+        await import('@calmeter/shared');
+
+      const payload = {
+        tier: SubscriptionTier.PREMIUM,
+        status: SubscriptionStatus.ACTIVE,
+        store: SubscriptionStore.APP_STORE,
+        planId: 'monthly_premium',
+        productId: 'com.calmeter.premium.monthly',
+        entitlements: ['premium_access'],
+        expiresAt: '2026-12-10T12:00:00.000Z',
+        autoRenewStatus: true,
+        isSandbox: false,
+        billingIssue: false,
+        cancelReason: null,
+        dailyUsage: {
+          [FeatureKey.AI_PHOTO_SCAN]: { count: 3, limit: 50, remaining: 47 },
+        },
+      };
+
+      expect(SubscriptionStatusResponseSchema.safeParse(payload).success).toBe(true);
+    });
+
+    it('validates RevenueCatWebhookPayloadSchema structure', async () => {
+      const { RevenueCatWebhookPayloadSchema } = await import('../src/subscription.contract.js');
+
+      const webhookData = {
+        api_version: '1.0',
+        event: {
+          id: 'evt_123456789',
+          type: 'INITIAL_PURCHASE',
+          app_user_id: 'user_uuid_abc',
+          product_id: 'com.calmeter.premium.annual',
+          entitlement_id: 'premium_access',
+          period_type: 'NORMAL',
+          purchased_at_ms: 1731234567000,
+          expiration_at_ms: 1762770567000,
+          environment: 'SANDBOX',
+          store: 'APP_STORE',
+          event_timestamp_ms: 1731234567000,
+        },
+      };
+
+      expect(RevenueCatWebhookPayloadSchema.safeParse(webhookData).success).toBe(true);
+    });
+
+    it('validates FeatureLimitExceededErrorSchema', async () => {
+      const { FeatureLimitExceededErrorSchema } = await import('../src/subscription.contract.js');
+      const { FeatureKey } = await import('@calmeter/shared');
+
+      const err = {
+        code: 'FEATURE_LIMIT_EXCEEDED',
+        message: 'Daily AI photo scan limit reached.',
+        feature: FeatureKey.AI_PHOTO_SCAN,
+        limit: 3,
+        currentUsage: 3,
+        upgradeUrl: '/paywall',
+      };
+
+      expect(FeatureLimitExceededErrorSchema.safeParse(err).success).toBe(true);
     });
   });
 });

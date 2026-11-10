@@ -19,6 +19,7 @@ import { GoalApiClient } from '../../services/goalApi';
 import type { UserProfileDto, NutritionGoalDto } from '@calmeter/contracts';
 import { PrimaryGoal, ActivityLevel } from '@calmeter/shared';
 import { OnboardingFlow } from '../onboarding/OnboardingFlow';
+import { ManageSubscriptionView } from '../subscription/ManageSubscriptionView';
 
 export interface ProfileScreenProps {
   profileClient?: ProfileApiClient;
@@ -385,6 +386,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             testID="btn-recalculate"
           />
         </Card>
+
+        {/* SECTION: SUBSCRIPTION & PREMIUM MEMBERSHIP */}
+        <ManageSubscriptionView />
 
         {/* SECTION: NUTRITION & BODY MANAGEMENT */}
         <SectionHeader title="Profile & Goal Settings" style={{ marginBottom: spacing.xs }} />

@@ -6,3 +6,5 @@ export * from './profileApi.js';
 export * from './goalApi.js';
 export * from './trackingApi.js';
 export * from './coachApi.js';
+export * from './subscriptionApi.js';
+export * from './revenueCatService.js';

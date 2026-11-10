@@ -69,6 +69,35 @@ export class DailyScanLimitReachedError extends AppError {
   }
 }
 
+export class FeatureLimitExceededError extends AppError {
+  public readonly feature: string;
+  public readonly limit?: number;
+  public readonly currentUsage?: number;
+  public readonly upgradeUrl: string;
+
+  constructor(
+    message: string,
+    feature: string,
+    limit?: number,
+    currentUsage?: number,
+    upgradeUrl = '/paywall',
+  ) {
+    super(message, 403, 'FEATURE_LIMIT_EXCEEDED', [
+      {
+        feature,
+        limit,
+        currentUsage,
+        upgradeUrl,
+        issue: message,
+      },
+    ]);
+    this.feature = feature;
+    this.limit = limit;
+    this.currentUsage = currentUsage;
+    this.upgradeUrl = upgradeUrl;
+  }
+}
+
 export class PayloadTooLargeError extends AppError {
   constructor(message = 'Request payload exceeds the permissible limit.') {
     super(message, 413, 'PAYLOAD_TOO_LARGE');

@@ -1368,3 +1368,144 @@ Returns tailored meal suggestions based on verified food database entries, respe
   }
 }
 ```
+
+---
+
+### Module 8: Subscriptions, Payments & Premium Entitlements
+
+Base URL: `/api/v1`
+
+#### 1. `GET /subscriptions/status`
+
+Retrieves current authoritative subscription and entitlement status from trusted backend database state. Never relies on client-reported entitlement booleans.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Response (`200 OK`, `SubscriptionStatusResponseDto`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "tier": "PREMIUM",
+    "status": "ACTIVE",
+    "store": "APP_STORE",
+    "planId": "annual_premium",
+    "productId": "calmeter_premium_annual",
+    "entitlements": ["premium_access"],
+    "expiresAt": "2027-11-10T18:00:00.000Z",
+    "autoRenewStatus": true,
+    "isSandbox": false,
+    "billingIssue": false,
+    "cancelReason": null,
+    "isActive": true,
+    "isCanceled": false,
+    "cancelAtPeriodEnd": false,
+    "dailyUsage": {
+      "AI_PHOTO_SCAN": { "count": 2, "limit": 50, "remaining": 48 },
+      "BARCODE_SCAN": { "count": 5, "remaining": null },
+      "COACH_CHAT": { "count": 1, "remaining": null }
+    },
+    "quotas": {
+      "AI_PHOTO_SCAN": { "dailyLimit": 50, "isAllowed": true },
+      "ADVANCED_ANALYTICS": { "isAllowed": true },
+      "HISTORY_RANGE": { "isAllowed": true }
+    }
+  }
+}
+```
+
+#### 2. `POST /subscriptions/sync`
+
+Synchronizes client-side RevenueCat user identifier with the backend subscription ledger.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Request Body (`SyncSubscriptionRequestDto`):**
+
+```json
+{
+  "appUserId": "usr_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+}
+```
+
+- **Response (`200 OK`, `SubscriptionStatusResponseDto`):** Returns updated subscription status object.
+
+#### 3. `GET /subscriptions/check-access`
+
+Pre-flight checks whether a user can access a specific feature or extended historical date range.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Query Parameters:**
+  - `feature` (required): Enum `AI_PHOTO_SCAN`, `BARCODE_SCAN`, `NUTRITION_LABEL_SCAN`, `COACH_CHAT`, `PERSONALIZED_INSIGHTS`, `HISTORY_RANGE`, `MEAL_RECOMMENDATIONS`, `ADVANCED_ANALYTICS`.
+  - `historyDays` (optional): Positive integer representing requested historical days.
+- **Response (`200 OK`, `FeatureAccessResponseDto`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "allowed": true,
+    "canAccess": true,
+    "feature": "AI_PHOTO_SCAN",
+    "tier": "FREE",
+    "limit": 3,
+    "dailyLimit": 3,
+    "currentUsage": 1,
+    "usedToday": 1,
+    "remaining": 2,
+    "remainingToday": 2
+  }
+}
+```
+
+- **Error (`403 Forbidden`, `FeatureLimitExceededError`):** Returned when feature access is denied or quota exhausted.
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "FEATURE_LIMIT_EXCEEDED",
+    "message": "Daily limit for AI_PHOTO_SCAN reached. Upgrade to Premium for 50 scans per day."
+  }
+}
+```
+
+#### 4. `POST /webhooks/revenuecat`
+
+Receives, verifies, and idempotently processes real-time server-to-server subscription lifecycle events emitted by RevenueCat.
+
+- **Authentication:** Required (`Authorization: Bearer <REVENUECAT_WEBHOOK_AUTH_TOKEN>`)
+- **Request Body (`RevenueCatWebhookPayloadDto`):**
+
+```json
+{
+  "api_version": "1.0",
+  "event": {
+    "id": "evt_rc_912384918239",
+    "type": "INITIAL_PURCHASE",
+    "app_user_id": "usr_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    "original_app_user_id": "usr_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    "product_id": "calmeter_premium_annual",
+    "entitlement_id": "premium_access",
+    "store": "APP_STORE",
+    "period_type": "NORMAL",
+    "purchased_at_ms": 1762797600000,
+    "expiration_at_ms": 1794333600000,
+    "event_timestamp_ms": 1762797602000,
+    "environment": "PRODUCTION"
+  }
+}
+```
+
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "PROCESSED",
+    "eventId": "evt_rc_912384918239",
+    "eventType": "INITIAL_PURCHASE",
+    "userId": "usr_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+  }
+}
+```
