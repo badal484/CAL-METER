@@ -133,52 +133,148 @@ Retrieves current authenticated user session and subscription entitlement status
 
 ---
 
-### Module 2: Profile & Nutrition Goals (`/profile`, `/goals`)
+### Module 2: Profile, Onboarding & Nutrition Goals (`/profile`, `/onboarding`, `/goals`)
 
 #### `GET /profile`
 
-Retrieves the user's biometric profile and dietary preferences.
+Retrieves the authenticated user's biometric profile and dietary preferences. Returns `404 Not Found` if onboarding has not been completed.
 
-#### `PUT /profile`
+- **Response (`200 OK`):**
 
-Updates user biometrics and recalculates baseline requirements.
+```json
+{
+  "success": true,
+  "data": {
+    "id": "7b0d7718-4df2-45e0-8339-4467ecbf4275",
+    "userId": "c53d9e03-34e8-4221-a320-141a27e777e5",
+    "name": "Badal Kumar",
+    "gender": "MALE",
+    "biologicalSex": "MALE",
+    "dob": "1996-06-15",
+    "heightCm": 178.0,
+    "currentWeightKg": 80.0,
+    "targetWeightKg": 74.0,
+    "activityLevel": "MODERATELY_ACTIVE",
+    "dietPreference": "VEGETARIAN",
+    "primaryGoal": "LOSE_WEIGHT",
+    "paceKgPerWeek": 0.5,
+    "timezone": "Asia/Kolkata",
+    "preferredUnits": "METRIC",
+    "createdAt": "2026-11-10T14:00:00.000Z",
+    "updatedAt": "2026-11-10T14:00:00.000Z"
+  }
+}
+```
+
+#### `PATCH /profile`
+
+Updates biometric measurements, goals, or preferences. When `currentWeightKg` is updated, a corresponding entry is automatically recorded in `WeightLog`.
 
 - **Request Body (Zod Validated):**
 
 ```json
 {
+  "name": "Badal Kumar",
+  "currentWeightKg": 79.5,
+  "activityLevel": "VERY_ACTIVE",
+  "targetWeightKg": 73.0,
+  "paceKgPerWeek": 0.5
+}
+```
+
+#### `POST /onboarding/complete`
+
+Atomically and idempotently completes the multi-step onboarding journey. Validates biometrics (strictly requiring age $\ge 18$), computes BMR via Mifflin-St Jeor, TDEE, calorie target, and macro distribution, then commits `UserProfile`, active `NutritionGoal`, and baseline `WeightLog` in a single ACID transaction.
+
+- **Request Body (Zod Validated):**
+
+```json
+{
+  "name": "Badal Kumar",
+  "dob": "1996-06-15",
   "gender": "MALE",
-  "dob": "1997-04-15",
-  "heightCm": 178.5,
-  "currentWeightKg": 82.0,
-  "targetWeightKg": 75.0,
-  "activityLevel": "MODERATELY_ACTIVE",
-  "dietPreference": "VEGETARIAN",
+  "biologicalSex": "MALE",
+  "heightCm": 178,
+  "currentWeightKg": 80,
+  "targetWeightKg": 74,
   "primaryGoal": "LOSE_WEIGHT",
+  "activityLevel": "MODERATELY_ACTIVE",
   "paceKgPerWeek": 0.5,
+  "dietPreference": "VEGETARIAN",
   "timezone": "Asia/Kolkata",
   "preferredUnits": "METRIC"
 }
 ```
 
+- **Response (`201 Created`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "profile": { ... },
+    "goal": { ... },
+    "calculations": {
+      "bmr": 1773,
+      "tdee": 2748,
+      "dailyCalories": 2198,
+      "proteinGrams": 145.0,
+      "carbsGrams": 242.0,
+      "fatGrams": 72.0,
+      "fiberGrams": 31.0,
+      "dailyDeficitOrSurplus": -550,
+      "paceKgPerWeek": 0.5,
+      "isBelowBmr": false,
+      "warnings": [],
+      "disclaimers": [
+        "BMR and TDEE are mathematical estimates based on population equations, not clinical measurements."
+      ]
+    }
+  }
+}
+```
+
+#### `GET /goals/current`
+
+Retrieves the active nutrition goal effective on the specified date (`?date=YYYY-MM-DD`, defaults to today). Resolves using `effectiveDate <= targetDate` ordered by `effectiveDate DESC, createdAt DESC`.
+
 #### `GET /goals`
 
-Returns current active daily calorie and macronutrient targets.
+Retrieves the historical timeline of all nutrition goals for the user.
 
-#### `PUT /goals`
+#### `POST /goals`
 
-Manual override of daily targets by user.
+Creates a new active nutrition goal with an effective date. Automatically marks prior active goals on or after the effective date as `SUPERSEDED` without altering historical diary logs.
+
+- **Request Body (Zod Validated):**
+
+```json
+{
+  "dailyCalories": 2200,
+  "proteinGrams": 150.0,
+  "carbsGrams": 235.0,
+  "fatGrams": 70.0,
+  "fiberGrams": 32.0,
+  "effectiveDate": "2026-12-01",
+  "primaryGoal": "MAINTAIN_WEIGHT"
+}
+```
+
+#### `PATCH /goals/:id`
+
+Updates an existing specific nutrition goal. Enforces multi-tenant ownership (returns `404 Not Found` if goal belongs to another user).
+
+#### `POST /goals/recalculate`
+
+Previews recalculated calorie and macronutrient targets based on updated biometrics, goal, or activity level without persisting changes to the database.
 
 - **Request Body:**
 
 ```json
 {
-  "dailyCalories": 2100,
-  "proteinGrams": 150,
-  "carbsGrams": 220,
-  "fatGrams": 65,
-  "fiberGrams": 35,
-  "waterMl": 3000
+  "primaryGoal": "BUILD_MUSCLE",
+  "paceKgPerWeek": 0.25,
+  "activityLevel": "VERY_ACTIVE"
 }
 ```
 
@@ -913,8 +1009,38 @@ Deletes a logged food item and atomically recalculates the parent meal's totals.
 
 ### Module 6: Tracking (`/tracking`)
 
-- `GET /tracking/weight`: Returns time-series historical weight readings.
-- `POST /tracking/weight`: Records a new weight measurement (`{ "weightKg": 81.6, "notes": "Morning fasted" }`).
+#### `POST /tracking/weight`
+
+Records a new body weight measurement in `WeightLog` and automatically synchronizes `UserProfile.currentWeightKg`.
+
+- **Request Body:**
+
+```json
+{
+  "weightKg": 81.6,
+  "notes": "Morning weigh-in before breakfast"
+}
+```
+
+- **Response (`201 Created`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "2c62c2f8-d4f1-4db8-9e66-7e3fba537b01",
+    "userId": "c53d9e03-34e8-4221-a320-141a27e777e5",
+    "weightKg": 81.6,
+    "loggedAt": "2026-11-10T14:30:00.000Z",
+    "notes": "Morning weigh-in before breakfast"
+  }
+}
+```
+
+#### `GET /tracking/weight`
+
+Returns historical weight logs for the authenticated user, ordered by `loggedAt DESC`.
+
 - `GET /tracking/water/:date`: Returns water consumption in ml for that day.
 - `POST /tracking/water`: Logs water intake increment (`{ "amountMl": 250, "date": "2026-11-10" }`).
 

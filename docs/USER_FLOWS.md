@@ -21,7 +21,7 @@ flowchart LR
 
 ---
 
-## 2. Journey 1: Authentication & Biometric Onboarding
+## 2. Journey 1: Authentication & Guided 6-Step Onboarding
 
 ```mermaid
 sequenceDiagram
@@ -30,30 +30,31 @@ sequenceDiagram
     participant App as Mobile App
     participant Auth as Firebase Auth
     participant API as Backend API
-    participant Engine as Nutrition Engine
+    participant Engine as Clinical Nutrition Engine
 
     User->>App: Opens app for the first time
     App->>User: Displays animated value proposition screens
-    User->>App: Selects "Sign in with Apple" (or Google / Phone)
+    User->>App: Signs in (Apple / Google / Phone)
     App->>Auth: Request OAuth credential
     Auth-->>App: Returns Firebase ID Token
     App->>API: POST /auth/sync
     API-->>App: User created (isOnboarded: false)
 
-    Note over User,App: Multi-Step Interactive Onboarding
-    User->>App: Step 1: Selects Gender (Male / Female / Other)
-    User->>App: Step 2: Inputs DOB, Height, Current Weight
-    User->>App: Step 3: Selects Baseline Activity Level (Sedentary to Extra Active)
-    User->>App: Step 4: Selects Goal (Lose Weight, Maintain, Build Muscle) & Target Weight
-    User->>App: Step 5: Selects Dietary Preference (Vegetarian, Vegan, Non-Veg, Jain, etc.)
+    Note over User,App: Guided 6-Step Personalization Flow
+    User->>App: Step 1: Enters DOB (age >= 18 check), Biological Sex (Mifflin-St Jeor), Height, Weight, Units
+    User->>App: Step 2: Selects Primary Goal (Lose Weight, Maintain, Build Muscle)
+    User->>App: Step 3: Selects Activity Level (Sedentary, Light, Moderate, Very, Extra Active)
+    User->>App: Step 4: Sets Target Weight and Weekly Pace (0.25 to 1.0 kg/week)
+    User->>App: Step 5: Selects Dietary Preferences (Vegetarian, Vegan, Eggetarian, Jain, Keto, Halal, Any)
 
-    App->>Engine: Run Mifflin-St Jeor + TDEE + Macro split formulas
-    Engine-->>App: Calculated Calorie Budget (e.g. 1,950 kcal) & Macros
-    App->>User: Animated Goal Reveal screen with customized timeline
-    User->>App: Taps "Start My Journey"
-    App->>API: PUT /profile & PUT /goals
-    API-->>App: 200 OK
-    App->>User: Transitions to Main Dashboard
+    App->>Engine: Run Mifflin-St Jeor (1990) + PAL + Target formulas
+    Engine-->>App: BMR, TDEE, Calorie budget, and Macro distribution
+    App->>User: Step 6: Displays Nutrition Blueprint Review with Disclaimers & Customizer
+    User->>App: Taps "Save & Start Journey"
+    App->>API: POST /api/v1/onboarding/complete
+    Note over API: ACID Transaction:<br/>1. Upsert UserProfile<br/>2. Create active NutritionGoal<br/>3. Log initial WeightLog
+    API-->>App: 201 Created (Profile, Goal, Calculations)
+    App->>User: Transitions to Main Dashboard with personalized targets
 ```
 
 ### Guest Mode Contingency
@@ -66,6 +67,46 @@ Users may tap "Explore as Guest". In this state:
 - Tapping the banner triggers non-destructive account linking (`linkWithCredential`), preserving all logged history.
 
 ---
+
+## 2.1. Journey 1B: Profile & Goal Management Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant App as Mobile App
+    participant API as Backend API
+
+    User->>App: Navigates to Profile Tab
+    App->>API: GET /api/v1/profile & GET /api/v1/goals/current
+    API-->>App: Returns active profile & current nutrition targets
+    App->>User: Renders biometrics card, active calorie/macro ring, and management options
+
+    alt Edit Body Measurements
+        User->>App: Taps "Body Measurements"
+        User->>App: Updates current weight to 79.5 kg
+        App->>API: PATCH /api/v1/profile (currentWeightKg: 79.5)
+        Note over API: Updates profile & records new entry in WeightLog
+        API-->>App: 200 OK (updated profile)
+        App->>User: Displays confirmation badge
+    else Customize Nutrition Targets
+        User->>App: Taps "Customize" on Active Goal Card
+        User->>App: Modifies protein to 160g, calories to 2,200 kcal
+        App->>API: PATCH /api/v1/goals/:id
+        API-->>App: 200 OK (updated goal)
+        App->>User: Dashboard immediately reflects updated calorie & macro budgets
+    else Recalculate Suggested Targets
+        User->>App: Taps "Recalculate Suggested Targets"
+        App->>API: POST /api/v1/goals/recalculate
+        API-->>App: Returns mathematical BMR/TDEE and suggested macros
+        App->>API: POST /api/v1/goals (creates new goal with effective date)
+        API-->>App: 201 Created
+        App->>User: Notifies user with recalculated targets
+    else Re-run Onboarding Setup
+        User->>App: Taps "Re-run Onboarding Setup Wizard"
+        App->>User: Launches 6-step guided onboarding questionnaire
+    end
+```
 
 ## 3. Journey 2: AI Food Photo Scanning (The Core Loop)
 

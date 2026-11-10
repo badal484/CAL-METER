@@ -247,3 +247,25 @@ CAL METER adheres to strict privacy-by-design principles regarding mobile camera
   - All responses referencing Open Food Facts data retain appropriate attribution markers (`source: OPEN_FOOD_FACTS`, `license: ODbL 1.0`).
   - Mobile product detail sheets prominently display: _"Data sourced from Open Food Facts under Open Database License (ODbL) 1.0."_
   - Any local enhancements to Open Food Facts database records remain compliant with ODbL share-alike provisions.
+
+---
+
+## 8. Biometric Data Governance & Non-Medical Safeguards
+
+### 8.1. Personal Biometric Isolation (Zero AI Exposure)
+
+- Personal body measurements (height, weight, body mass index, date of birth, age, and biological sex) are classified as **Sensitive Personal Data (SPD)**.
+- Biometric records are stored strictly in private, encrypted PostgreSQL tables (`user_profiles`, `nutrition_goals`, `weight_logs`) with multi-tenant row-level authorization.
+- **Strict Prohibition on Third-Party AI Transmission:** Under no circumstances are user body measurements, biometrics, weight trends, or personal goals transmitted to external multimodal vision providers (such as Google Gemini, OpenAI, Anthropic, or Hugging Face). Multimodal vision pipelines receive only sanitized food imagery.
+
+### 8.2. Medical Disclaimers & Non-Clinical Positioning
+
+- CAL METER is a consumer wellness and lifestyle application. It is **not** a medical device, diagnostic tool, or clinical prescription service.
+- All algorithmic calorie and macronutrient suggestions derived from the Mifflin-St Jeor equation (1990) and Physical Activity Level (PAL) multipliers represent mathematical approximations of statistical energy balance.
+- Every results and onboarding screen includes prominent disclaimers informing users to treat values as starting reference baselines, evaluate real-world weight trends over 2–4 weeks, and consult qualified healthcare professionals before undertaking extreme dietary interventions.
+
+### 8.3. Safe Boundary Enforcement & Minor Protection
+
+- Mifflin-St Jeor and standard adult energy expenditure models are clinically invalid for pediatric populations.
+- All onboarding and recalculation endpoints strictly reject individuals under 18 years of age, preventing the application of adult restriction targets to developing minors.
+- Physiological bounds checks enforce reasonable constraints on all inputs (weight: 30–350 kg, height: 100–250 cm, age: 18–120 years). Any values outside validated bounds fail closed with `VALIDATION_ERROR`.

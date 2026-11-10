@@ -5,6 +5,10 @@ import { createAuthRouter } from './auth.routes.js';
 import { createFoodRouter } from './food.routes.js';
 import { createScanRouter } from './scan.routes.js';
 import { createDiaryRouter } from './diary.routes.js';
+import { createProfileRouter } from './profile.routes.js';
+import { createOnboardingRouter } from './onboarding.routes.js';
+import { createGoalRouter } from './goal.routes.js';
+import { createTrackingRouter } from './tracking.routes.js';
 import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 import type { BarcodeLookupService } from '../services/barcode/barcodeLookup.service.js';
 
@@ -40,6 +44,22 @@ export function createRootRouter(options?: RouteOptions): Router {
   v1Router.use(
     '/diary',
     createDiaryRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/profile',
+    createProfileRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/onboarding',
+    createOnboardingRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/goals',
+    createGoalRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+  );
+  v1Router.use(
+    '/tracking',
+    createTrackingRouter({ verifier: options?.verifier, prisma: options?.prisma }),
   );
 
   rootRouter.use('/api/v1', v1Router);

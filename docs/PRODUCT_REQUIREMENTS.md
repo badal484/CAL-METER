@@ -104,24 +104,45 @@ flowchart TD
 - **FR-1.3:** Maintain secure session tokens via short-lived JWTs and auto-refresh mechanisms.
 - **FR-1.4:** Enforce server-side user record synchronization via PostgreSQL transaction upon first authentication.
 
-### 5.2. Personal Onboarding & Goal Calculation (Features 2 & 3)
+### 5.2. User Onboarding, Nutrition Goals & Personalization (Feature 2)
 
-- **FR-2.1:** Collect biometrics: Gender, Date of Birth (Age), Height (cm or ft/in), Current Weight (kg or lbs), Target Weight, Desired Pace (0.1 kg to 1.0 kg per week).
-- **FR-2.2:** Collect lifestyle inputs: Baseline Activity Level (Sedentary, Lightly Active, Moderately Active, Very Active, Extra Active), Dietary Restrictions (Vegetarian, Vegan, Non-Vegetarian, Eggetarian, Jain, Keto, Halal), Primary Goal (Lose Weight, Maintain Weight, Build Muscle).
-- **FR-2.3:** Calculate Basal Metabolic Rate (BMR) using the validated **Mifflin-St Jeor equation**:
-  $$\text{BMR}_{\text{men}} = 10 \times \text{weight (kg)} + 6.25 \times \text{height (cm)} - 5 \times \text{age (y)} + 5$$
-  $$\text{BMR}_{\text{women}} = 10 \times \text{weight (kg)} + 6.25 \times \text{height (cm)} - 5 \times \text{age (y)} - 161$$
-- **FR-2.4:** Compute Total Daily Energy Expenditure (TDEE) = $\text{BMR} \times \text{PAL (Physical Activity Level)}$.
-- **FR-2.5: Safe Calculation Boundaries & Unsupported Populations:**
-  - BMR and TDEE are mathematical estimates, not medical prescriptions.
-  - **No Universal Floor:** Do not enforce arbitrary universal calorie floors (e.g. 1,200/1,500 kcal). Safety is evaluated dynamically relative to the user's specific TDEE and BMR.
-  - **No Aggressive Targets:** Daily deficits exceeding 25% of TDEE or target paces exceeding 1.0 kg/week are flagged with clinical warnings.
-  - **Unsupported Populations:** Standard adult predictive equations are not clinically validated for minors (under 18) or during pregnancy and lactation. When these conditions are detected, automated calorie target generation is restricted, returning safe guidance disclaimers.
-- **FR-2.6:** Generate initial Macronutrient Distribution based on goal archetype:
-  - _Fat Loss:_ 30% Protein, 40% Carbohydrates, 30% Fat.
-  - _Muscle Gain:_ 30% Protein, 50% Carbohydrates, 20% Fat.
-  - _Maintenance:_ 25% Protein, 50% Carbohydrates, 25% Fat.
-- **FR-2.7:** Provide manual override allowing users to customize exact gram/macro ratios and revise targets at any time.
+- **FR-2.1: Guided 6-Step Multi-Stage Onboarding Flow:**
+  - **Step 1: Basic Information:** User display name (optional), Date of Birth (YYYY-MM-DD), Biological Sex (`MALE`, `FEMALE`), Height, Weight, and Unit System toggle (Metric cm/kg vs Imperial ft-in/lbs).
+    - _Biological Sex Disclosure:_ Transparently informs the user that biological sex assigned at birth is required strictly for physiological accuracy in the clinical Mifflin-St Jeor equation due to lean muscle mass and organ weight variance; respects user gender identity.
+    - _Age Verification:_ Strictly enforces adult validation ($\ge 18$ years old). Minors are rejected with supportive guidance regarding specialized pediatric clinical oversight.
+  - **Step 2: Primary Goal Selection:** `LOSE_WEIGHT` (sustainable deficit), `MAINTAIN_WEIGHT` (energy balance and recomposition), or `BUILD_MUSCLE` (modest surplus with elevated protein). Provides explicit educational guidance on energy balance vs resistance training.
+  - **Step 3: Baseline Activity Level:** Clearly defines physical activity levels with concrete daily routines (Sedentary, Lightly Active, Moderately Active, Very Active, Extra Active) to prevent common user overestimation.
+  - **Step 4: Target Selection & Progression Pace:** Target weight input and safe weekly pace selector (0.25 kg/wk, 0.50 kg/wk recommended standard, 0.75 kg/wk, 1.00 kg/wk aggressive maximum). Displays safety warnings for paces exceeding 1.0 kg/week.
+  - **Step 5: Nutrition Preferences:** Support for Indian regional and global dietary patterns (Any, Vegetarian, Vegan, Eggetarian, Jain with root vegetable exclusion, Keto, Halal) with an option to skip.
+  - **Step 6: Blueprint Review & Results:** Real-time preview of computed BMR, TDEE, suggested daily calories, macro distribution (Protein, Carbs, Fat, Fiber), deficit/surplus breakdown, and prominent non-medical disclaimers.
+- **FR-2.2: Deterministic Clinical Calculation Pipeline:**
+  - Calculate Basal Metabolic Rate (BMR) via the clinically validated **Mifflin-St Jeor equation (1990)**:
+    $$\text{BMR}_{\text{male}} = 10 \times \text{weight (kg)} + 6.25 \times \text{height (cm)} - 5 \times \text{age (y)} + 5$$
+    $$\text{BMR}_{\text{female}} = 10 \times \text{weight (kg)} + 6.25 \times \text{height (cm)} - 5 \times \text{age (y)} - 161$$
+  - Calculate Total Daily Energy Expenditure (TDEE) via Physical Activity Level (PAL) multipliers (Sedentary: 1.20, Lightly Active: 1.375, Moderately Active: 1.55, Very Active: 1.725, Extra Active: 1.90).
+  - Compute target caloric intake based on metabolic rate and desired pace:
+    - _Weight Loss:_ Target = $\text{TDEE} - (\text{pace (kg/wk)} \times 7700 / 7)$. Flagged if target falls below BMR.
+    - _Muscle Gain:_ Target = $\text{TDEE} + (\text{pace (kg/wk)} \times 7700 / 7)$.
+    - _Maintenance:_ Target = TDEE.
+- **FR-2.3: Safe Calculation Boundaries & Unsupported Populations:**
+  - BMR and TDEE are mathematical population estimates, not clinical or medical prescriptions.
+  - **No Universal Floor:** Avoid arbitrary fixed floors (e.g. 1,200/1,500 kcal). Safety is evaluated dynamically relative to user biometrics, BMR, and TDEE.
+  - **Deficit Warnings:** Daily deficits $> 25\%$ of TDEE or paces $> 1.0$ kg/week trigger explicit clinical advisories.
+  - **Unsupported Populations:** Adult predictive equations are unvalidated for minors (< 18) or pregnancy/lactation. Automated goal generation is blocked with supportive guidance.
+- **FR-2.4: Macronutrient & Fiber Distribution:**
+  - Protein: 1.6–2.2 g/kg body weight for muscle building/deficit preservation; 1.2–1.6 g/kg for general maintenance.
+  - Fat: 20–35% of total caloric energy.
+  - Carbohydrates: Remaining caloric budget after protein and fat allocation.
+  - Dietary Fiber: Recommended minimum 14g per 1,000 kcal (typically 28–38g daily).
+- **FR-2.5: User Customization & Target Overrides:**
+  - Users can manually customize daily calories or macro grams at any time.
+  - Real-time Atwater factor consistency checking ($4 \times \text{P} + 4 \times \text{C} + 9 \times \text{F}$) alerts users to energy discrepancies $> 10\%$.
+- **FR-2.6: Atomic Persistence & Historical Date Resolving:**
+  - `POST /onboarding/complete` persists `UserProfile`, active `NutritionGoal`, and baseline `WeightLog` in a single ACID transaction.
+  - Goals are versioned with `effectiveDate` and `status` (`ACTIVE`, `ARCHIVED`, `SUPERSEDED`).
+  - Historical diary views resolve the goal effective on each specific date without rewriting past logs.
+- **FR-2.7: Profile & Goal Management Experience:**
+  - Mobile profile dashboard allows viewing biometrics and active goals, editing body measurements (syncing `WeightLog`), updating goals/activity, customizing targets, recalculating baselines, and re-running the onboarding wizard.
 
 ### 5.3. AI Food Photo & Gallery Scanner (Features 4 & 5)
 

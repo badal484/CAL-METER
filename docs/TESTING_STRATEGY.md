@@ -100,10 +100,29 @@ describe('Nutrition Math Engine', () => {
     - Atomic persistence of newly resolved external products into local PostgreSQL database (`food_items`, `food_barcodes`, `food_nutrient_profiles`, `serving_unit_conversions`).
     - Strict preservation of `null` vs `0` for unmeasured micronutrients across providers.
     - Multi-tenant custom food isolation: custom foods bound to barcodes are strictly hidden from other tenants (`404 Not Found`).
+  - **Onboarding, Profile & Goal Personalization Subsystem (`apps/api/tests/onboardingAndProfile.test.ts`):**
+    - Minor protection: strictly rejects date of birth for users under 18 years of age.
+    - Physiological boundary checking: validates height (100–250 cm) and weight (30–350 kg) bounds.
+    - Transactional onboarding completion (`POST /onboarding/complete`): atomically upserts `UserProfile`, creates active `NutritionGoal` with calculated Mifflin-St Jeor values, and creates baseline `WeightLog` in a single ACID transaction.
+    - Idempotency: repeated submissions update profile without duplicating records.
+    - Profile management (`GET /profile`, `PATCH /profile`): handles unonboarded 404 state; tracks weight changes automatically in `WeightLog`.
+    - Active goal resolution (`GET /goals/current`): resolves active goal by `effectiveDate <= targetDate` ordered by `effectiveDate DESC, createdAt DESC`.
+    - Goal history timeline (`GET /goals`) and manual overrides (`POST /goals`, `PATCH /goals/:id`).
+    - Preview target recalculations (`POST /goals/recalculate`) without database side effects.
+    - Weight tracking subsystem (`POST /tracking/weight`, `GET /tracking/weight`).
+    - Multi-tenant security: cross-tenant access to another user's goals or profile returns 404.
 
 ### 2.3. Mobile Component & Workflow Testing (`apps/mobile/tests/`)
 
 - **Test Runner:** Vitest + React Test Renderer with full design system mock environment.
+- **Onboarding & Profile Suite (`apps/mobile/tests/onboarding.test.tsx`):**
+  - Full 6-step guided onboarding workflow: basic info, primary goal, activity level, target selection, diet preferences, blueprint review.
+  - Non-destructive back navigation preserving draft state across steps.
+  - Dynamic unit conversion: switches between Metric (cm/kg) and Imperial (ft-in/lbs).
+  - ProfileScreen hydration: loads and displays user biometrics, active calorie target, and macro distribution.
+  - Body measurements modal: modifies height/weight and commits updates.
+  - Target customization modal: modifies daily calories, protein, carbs, fat, fiber.
+  - Recalculate targets action: triggers mathematical recalculation and updates active goal.
 - **Diary Screen Suite (`apps/mobile/tests/diary.test.tsx`):**
   - Initial loading skeleton/spinner followed by daily summary card hydration.
   - All four canonical meal sections (Breakfast, Lunch, Dinner, Snacks) rendered with food item rows and empty state placeholders.

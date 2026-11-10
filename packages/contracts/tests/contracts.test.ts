@@ -725,6 +725,104 @@ describe('Contracts Runtime Schema Validation', () => {
         expect(parsed.success).toBe(false);
       });
     });
+
+    describe('Barcode & Packaged Food Contracts', () => {
+      it('validates and normalizes BarcodeParamSchema input', () => {
+        const parsed = BarcodeParamSchema.safeParse({ barcode: ' 8901030-825484 ' });
+        expect(parsed.success).toBe(true);
+        if (parsed.success) {
+          expect(parsed.data.barcode).toBe('8901030825484');
+        }
+      });
+
+      it('rejects empty or excessive barcode in BarcodeParamSchema', () => {
+        expect(BarcodeParamSchema.safeParse({ barcode: '' }).success).toBe(false);
+        expect(BarcodeParamSchema.safeParse({ barcode: 'a'.repeat(65) }).success).toBe(false);
+      });
+
+      it('validates a complete PackagedProductDtoSchema payload', () => {
+        const product = {
+          id: 'b6f6d0a7-47b7-4c7b-b5d4-5b23d9a04a11',
+          barcode: '8901030825484',
+          additionalBarcodes: ['08901030825484'],
+          name: 'Parle-G Original Gluco Biscuits',
+          brand: 'Parle',
+          manufacturer: 'Parle Products Pvt. Ltd.',
+          imageUrl:
+            'https://images.openfoodfacts.org/images/products/890/103/082/5484/front_en.jpg',
+          categories: ['Snacks', 'Sweet snacks', 'Biscuits and cakes'],
+          countries: ['India', 'United States'],
+          ingredientsText: 'Wheat flour, sugar, edible vegetable oil, invert sugar syrup, salt.',
+          allergens: ['wheat', 'gluten'],
+          servingSize: 30,
+          servingUnit: 'g',
+          standardWeightGrams: 100,
+          netWeightGrams: 250,
+          isLiquid: false,
+          nutrientsPer100g: {
+            calories: 450,
+            protein: 7.5,
+            carbs: 78,
+            fat: 13,
+            fiber: 2.5,
+            sugar: 26,
+            sodium: 280,
+            micronutrients: {},
+          },
+          nutrientsPerServing: {
+            calories: 135,
+            protein: 2.25,
+            carbs: 23.4,
+            fat: 3.9,
+            fiber: 0.75,
+            sugar: 7.8,
+            sodium: 84,
+            micronutrients: {},
+          },
+          servingConversions: [
+            {
+              unit: 'biscuit',
+              gramWeight: 5,
+              servingDescription: '1 biscuit (~5g)',
+            },
+          ],
+          source: FoodSource.OPEN_FOOD_FACTS,
+          attribution: 'Data sourced from Open Food Facts under ODbL 1.0',
+          license: 'ODbL 1.0',
+          isVerified: false,
+          dataQuality: DataQuality.EXTERNAL_SOURCE,
+          missingNutrients: [],
+        };
+
+        const parsed = PackagedProductDtoSchema.safeParse(product);
+        expect(parsed.success).toBe(true);
+      });
+
+      it('rejects negative nutrients in PackagedProductDtoSchema', () => {
+        const invalid = {
+          id: 'b6f6d0a7-47b7-4c7b-b5d4-5b23d9a04a11',
+          barcode: '8901030825484',
+          name: 'Test Product',
+          servingSize: 100,
+          servingUnit: 'g',
+          standardWeightGrams: 100,
+          nutrientsPer100g: {
+            calories: -100, // Invalid!
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+          },
+          source: FoodSource.OPEN_FOOD_FACTS,
+          attribution: 'Test',
+          license: 'ODbL 1.0',
+          isVerified: false,
+          dataQuality: DataQuality.INCOMPLETE,
+        };
+
+        const parsed = PackagedProductDtoSchema.safeParse(invalid);
+        expect(parsed.success).toBe(false);
+      });
+    });
   });
 
   describe('Food Database & Nutrition Contracts', () => {
@@ -887,6 +985,104 @@ describe('Contracts Runtime Schema Validation', () => {
 
       it('rejects limit exceeding 100 to prevent unbounded queries', () => {
         const parsed = FoodSearchQuerySchema.safeParse({ q: 'dal', limit: '500' });
+        expect(parsed.success).toBe(false);
+      });
+    });
+
+    describe('Barcode & Packaged Food Contracts', () => {
+      it('validates and normalizes BarcodeParamSchema input', () => {
+        const parsed = BarcodeParamSchema.safeParse({ barcode: ' 8901030-825484 ' });
+        expect(parsed.success).toBe(true);
+        if (parsed.success) {
+          expect(parsed.data.barcode).toBe('8901030825484');
+        }
+      });
+
+      it('rejects empty or excessive barcode in BarcodeParamSchema', () => {
+        expect(BarcodeParamSchema.safeParse({ barcode: '' }).success).toBe(false);
+        expect(BarcodeParamSchema.safeParse({ barcode: 'a'.repeat(65) }).success).toBe(false);
+      });
+
+      it('validates a complete PackagedProductDtoSchema payload', () => {
+        const product = {
+          id: 'b6f6d0a7-47b7-4c7b-b5d4-5b23d9a04a11',
+          barcode: '8901030825484',
+          additionalBarcodes: ['08901030825484'],
+          name: 'Parle-G Original Gluco Biscuits',
+          brand: 'Parle',
+          manufacturer: 'Parle Products Pvt. Ltd.',
+          imageUrl:
+            'https://images.openfoodfacts.org/images/products/890/103/082/5484/front_en.jpg',
+          categories: ['Snacks', 'Sweet snacks', 'Biscuits and cakes'],
+          countries: ['India', 'United States'],
+          ingredientsText: 'Wheat flour, sugar, edible vegetable oil, invert sugar syrup, salt.',
+          allergens: ['wheat', 'gluten'],
+          servingSize: 30,
+          servingUnit: 'g',
+          standardWeightGrams: 100,
+          netWeightGrams: 250,
+          isLiquid: false,
+          nutrientsPer100g: {
+            calories: 450,
+            protein: 7.5,
+            carbs: 78,
+            fat: 13,
+            fiber: 2.5,
+            sugar: 26,
+            sodium: 280,
+            micronutrients: {},
+          },
+          nutrientsPerServing: {
+            calories: 135,
+            protein: 2.25,
+            carbs: 23.4,
+            fat: 3.9,
+            fiber: 0.75,
+            sugar: 7.8,
+            sodium: 84,
+            micronutrients: {},
+          },
+          servingConversions: [
+            {
+              unit: 'biscuit',
+              gramWeight: 5,
+              servingDescription: '1 biscuit (~5g)',
+            },
+          ],
+          source: FoodSource.OPEN_FOOD_FACTS,
+          attribution: 'Data sourced from Open Food Facts under ODbL 1.0',
+          license: 'ODbL 1.0',
+          isVerified: false,
+          dataQuality: DataQuality.EXTERNAL_SOURCE,
+          missingNutrients: [],
+        };
+
+        const parsed = PackagedProductDtoSchema.safeParse(product);
+        expect(parsed.success).toBe(true);
+      });
+
+      it('rejects negative nutrients in PackagedProductDtoSchema', () => {
+        const invalid = {
+          id: 'b6f6d0a7-47b7-4c7b-b5d4-5b23d9a04a11',
+          barcode: '8901030825484',
+          name: 'Test Product',
+          servingSize: 100,
+          servingUnit: 'g',
+          standardWeightGrams: 100,
+          nutrientsPer100g: {
+            calories: -100, // Invalid!
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+          },
+          source: FoodSource.OPEN_FOOD_FACTS,
+          attribution: 'Test',
+          license: 'ODbL 1.0',
+          isVerified: false,
+          dataQuality: DataQuality.INCOMPLETE,
+        };
+
+        const parsed = PackagedProductDtoSchema.safeParse(invalid);
         expect(parsed.success).toBe(false);
       });
     });

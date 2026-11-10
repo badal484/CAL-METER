@@ -116,3 +116,9 @@ export enum DataQuality {
   USER_ENTERED = 'USER_ENTERED',
   INCOMPLETE = 'INCOMPLETE',
 }
+
+export enum GoalStatus {
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED',
+  SUPERSEDED = 'SUPERSEDED',
+}

@@ -194,7 +194,7 @@ export class DiaryService {
         userId,
         effectiveDate: { lte: targetDate },
       },
-      orderBy: { effectiveDate: 'desc' },
+      orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }],
     });
 
     const calorieGoal = goal ? goal.dailyCalories : 2000;

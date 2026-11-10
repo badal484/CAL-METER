@@ -26,6 +26,7 @@ export interface ButtonProps {
   textStyle?: StyleProp<TextStyle>;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  testID?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -41,6 +42,7 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   accessibilityLabel,
   accessibilityHint,
+  testID,
 }) => {
   const { theme } = useTheme();
   const { colors, typography, radii, spacing, dimensions } = theme;
@@ -128,6 +130,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <Pressable
+      testID={testID}
       onPress={isInteractive ? onPress : undefined}
       disabled={!isInteractive}
       accessible

@@ -49,6 +49,7 @@ erDiagram
         uuid id PK
         uuid userId FK,UK
         enum gender
+        enum biologicalSex
         date dob
         decimal heightCm
         decimal currentWeightKg
@@ -71,6 +72,11 @@ erDiagram
         decimal fiberGrams
         int waterMl
         date effectiveDate
+        enum status
+        enum primaryGoal
+        decimal targetWeightKg
+        datetime createdAt
+        datetime updatedAt
     }
 
     FoodCategory {
@@ -392,42 +398,48 @@ model User {
 }
 
 model UserProfile {
-  id                String         @id @default(uuid()) @db.Uuid
-  userId            String         @unique @map("user_id") @db.Uuid
-  gender            Gender         @default(PREFER_NOT_TO_SAY)
-  dob               DateTime?      @db.Date
-  heightCm          Decimal        @map("height_cm") @db.Decimal(5, 2)
-  currentWeightKg   Decimal        @map("current_weight_kg") @db.Decimal(5, 2)
-  targetWeightKg    Decimal        @map("target_weight_kg") @db.Decimal(5, 2)
-  activityLevel     ActivityLevel  @default(MODERATELY_ACTIVE) @map("activity_level")
-  dietPreference    DietPreference @default(ANY) @map("diet_preference")
-  primaryGoal       PrimaryGoal    @default(LOSE_WEIGHT) @map("primary_goal")
-  paceKgPerWeek     Decimal        @default(0.50) @map("pace_kg_per_week") @db.Decimal(3, 2)
-  timezone          String         @default("Asia/Kolkata")
-  preferredUnits    UnitSystem     @default(METRIC) @map("preferred_units")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  id                String          @id @default(uuid()) @db.Uuid
+  userId            String          @unique @map("user_id") @db.Uuid
+  gender            Gender          @default(PREFER_NOT_TO_SAY)
+  biologicalSex     BiologicalSex?  @map("biological_sex")
+  dob               DateTime?       @db.Date
+  heightCm          Decimal         @map("height_cm") @db.Decimal(5, 2)
+  currentWeightKg   Decimal         @map("current_weight_kg") @db.Decimal(5, 2)
+  targetWeightKg    Decimal?        @map("target_weight_kg") @db.Decimal(5, 2)
+  activityLevel     ActivityLevel   @default(MODERATELY_ACTIVE) @map("activity_level")
+  dietPreference    DietPreference  @default(ANY) @map("diet_preference")
+  primaryGoal       PrimaryGoal     @default(LOSE_WEIGHT) @map("primary_goal")
+  paceKgPerWeek     Decimal         @default(0.50) @map("pace_kg_per_week") @db.Decimal(3, 2)
+  timezone          String          @default("Asia/Kolkata")
+  preferredUnits    UnitSystem      @default(METRIC) @map("preferred_units")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
 
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
 }
 
 model NutritionGoal {
-  id            String    @id @default(uuid()) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  dailyCalories Int       @map("daily_calories")
-  proteinGrams  Decimal   @map("protein_grams") @db.Decimal(6, 2)
-  carbsGrams    Decimal   @map("carbs_grams") @db.Decimal(6, 2)
-  fatGrams      Decimal   @map("fat_grams") @db.Decimal(6, 2)
-  fiberGrams    Decimal   @default(30.00) @map("fiber_grams") @db.Decimal(6, 2)
-  waterMl       Int       @default(2500) @map("water_ml")
-  effectiveDate DateTime  @default(now()) @map("effective_date") @db.Date
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  dailyCalories  Int          @map("daily_calories")
+  proteinGrams   Decimal      @map("protein_grams") @db.Decimal(6, 2)
+  carbsGrams     Decimal      @map("carbs_grams") @db.Decimal(6, 2)
+  fatGrams       Decimal      @map("fat_grams") @db.Decimal(6, 2)
+  fiberGrams     Decimal      @default(30.00) @map("fiber_grams") @db.Decimal(6, 2)
+  waterMl        Int          @default(2500) @map("water_ml")
+  effectiveDate  DateTime     @default(now()) @map("effective_date") @db.Date
+  status         GoalStatus   @default(ACTIVE)
+  primaryGoal    PrimaryGoal? @map("primary_goal")
+  targetWeightKg Decimal?     @map("target_weight_kg") @db.Decimal(5, 2)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, effectiveDate(sort: Desc)])
+  @@index([userId, status])
   @@map("nutrition_goals")
 }
 
