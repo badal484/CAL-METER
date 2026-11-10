@@ -1,0 +1,12 @@
+node_modules/
+**/node_modules/**
+dist/
+**/dist/**
+build/
+**/build/**
+coverage/
+**/coverage/**
+package-lock.json
+.DS_Store
+apps/mobile/android/
+apps/mobile/ios/

@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Coverage
+coverage/
+.nyc_output/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Mobile Native Builds
+apps/mobile/android/.gradle/
+apps/mobile/android/app/build/
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/
+apps/mobile/.bundle/

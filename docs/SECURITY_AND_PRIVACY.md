@@ -3,19 +3,21 @@
 **Document Version:** 1.0.0  
 **Status:** Approved Architecture Draft  
 **Owner:** Principal Security Architect & Data Protection Officer  
-**Last Updated:** November 2026  
+**Last Updated:** November 2026
 
 ---
 
 ## 1. Compliance Framework & Privacy Principles
 
 CAL METER handles personal health, dietary, and biometric data. It is engineered from day one to comply with:
+
 - **GDPR** (General Data Protection Regulation — European Union).
 - **DPDP Act 2023** (Digital Personal Data Protection Act — India).
 - **Apple App Store Review Guidelines** (Section 5.1: Privacy, Data Use, and Account Deletion).
 - **Google Play Developer Policies** (Health and Sensitive Data Policies).
 
 ### Core Privacy Principles:
+
 1. **Data Minimization:** We collect only biometrics strictly required to compute BMR/TDEE (gender, age, height, weight).
 2. **Explicit Consent:** First-scan onboarding explicitly prompts users to consent to AI processing of food photographs.
 3. **No Monetization of Personal Health Data:** User dietary patterns and biometrics are never sold, rented, or shared with third-party advertising networks.
@@ -28,7 +30,7 @@ CAL METER handles personal health, dietary, and biometric data. It is engineered
 ```mermaid
 graph TD
     Attacker[External Threat Actor]
-    
+
     subgraph AttackVectors["Threat Vectors"]
         T1[Token Hijacking / Replay]
         T2[IDOR: Insecure Direct Object Reference]
@@ -58,6 +60,7 @@ graph TD
 ## 3. Authentication & Authorization Security
 
 ### 3.1. Firebase Token Verification
+
 - Client requests obtain an RS256-signed ID token from Firebase Auth.
 - Backend middleware intercepts the `Authorization: Bearer <token>` header:
   ```typescript
@@ -69,7 +72,7 @@ graph TD
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        error: { code: 'AUTH_UNAUTHORIZED', message: 'Missing Bearer token.' }
+        error: { code: 'AUTH_UNAUTHORIZED', message: 'Missing Bearer token.' },
       });
     }
 
@@ -79,27 +82,28 @@ graph TD
       req.user = {
         firebaseUid: decoded.uid,
         email: decoded.email,
-        internalUserId: await resolveInternalUserId(decoded.uid)
+        internalUserId: await resolveInternalUserId(decoded.uid),
       };
       next();
     } catch (err) {
       return res.status(401).json({
         success: false,
-        error: { code: 'AUTH_TOKEN_EXPIRED', message: 'Invalid or revoked token.' }
+        error: { code: 'AUTH_TOKEN_EXPIRED', message: 'Invalid or revoked token.' },
       });
     }
   }
   ```
 
 ### 3.2. Multi-Tenant Isolation
+
 - Insecure Direct Object References (IDOR) are eliminated at the data layer. All Prisma service operations enforce tenant constraints:
   ```typescript
   // SECURE: Automatically scoped to authenticated user
   const meal = await prisma.mealEntry.findFirst({
     where: {
       id: mealId,
-      userId: req.user.internalUserId // Enforces tenant boundary
-    }
+      userId: req.user.internalUserId, // Enforces tenant boundary
+    },
   });
   ```
 
@@ -108,6 +112,7 @@ graph TD
 ## 4. Storage Security & Image Privacy
 
 ### 4.1. Direct-to-Storage Isolation
+
 - Mobile clients upload images directly to private S3-compatible buckets (Cloudflare R2 or AWS S3) via presigned URLs.
 - Presigned URLs are cryptographically signed with:
   - Maximum expiration: **300 seconds (5 minutes)**.
@@ -116,6 +121,7 @@ graph TD
 - Public bucket access is completely disabled. Images are accessed by the background worker using private AWS IAM / S3 SDK credentials.
 
 ### 4.2. Automated Retention & Scrubbing
+
 - **Raw Image Purge:** Scan photos are temporary artifacts for AI inference. The background worker schedules deletion of unconfirmed or transient image files after **30 days**.
 - If a user opts into the "Photo Food Diary" feature, images are retained in encrypted cold storage and linked to the verified meal record.
 
@@ -172,7 +178,7 @@ const envSchema = z.object({
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
-  REVENUECAT_WEBHOOK_SECRET: z.string().min(1)
+  REVENUECAT_WEBHOOK_SECRET: z.string().min(1),
 });
 
 export const ENV = envSchema.parse(process.env);

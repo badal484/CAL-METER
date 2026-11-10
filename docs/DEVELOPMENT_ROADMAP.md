@@ -3,7 +3,7 @@
 **Document Version:** 1.0.0  
 **Status:** Approved Architecture Draft  
 **Owner:** Technical Lead & Principal Architect  
-**Last Updated:** November 2026  
+**Last Updated:** November 2026
 
 ---
 
@@ -31,20 +31,22 @@ flowchart TD
 ---
 
 ### Milestone 1: Workspace & Monorepo Foundation
+
 - **Scope:**
-  - Initialize `pnpm` monorepo configuration with workspaces (`apps/*`, `packages/*`).
-  - Configure root TypeScript `tsconfig.base.json`, ESLint, Prettier, and Git pre-commit hooks.
-  - Implement `@calmeter/shared`: BMR (Mifflin-St Jeor), TDEE, macro formulas, regional conversion units (*katori*, *roti*, *cup*, *grams*).
-  - Implement `@calmeter/contracts`: Zod schemas for Auth, Profile, Goals, Scans, Foods, and Diary requests/responses.
+  - Initialize `npm` monorepo configuration with npm workspaces (`apps/*`, `packages/*`).
+  - Configure root TypeScript `tsconfig.base.json`, ESLint, Prettier, and environment scripts.
+  - Implement `@calmeter/shared`: BMR (Mifflin-St Jeor with safe population checks), TDEE, macro formulas, food-specific regional conversion units (_katori_, _roti_, _cup_, _grams_).
+  - Implement `@calmeter/contracts`: Zod schemas for Auth, Profile, Goals, Scans, Foods, Servings, and Diary requests/responses.
 - **Dependencies:** None.
 - **Acceptance Criteria:**
-  1. `pnpm build` compiles all packages with zero TypeScript warnings or errors.
+  1. `npm run build` compiles all packages with zero TypeScript warnings or errors.
   2. 100% unit test coverage for `@calmeter/shared` mathematical formulas with Vitest.
   3. Shared Zod contracts validate both valid and invalid fixtures across all domain entities.
 
 ---
 
 ### Milestone 2: Infrastructure & Backend Core
+
 - **Scope:**
   - Docker Compose configuration for PostgreSQL 16 and Redis 7.
   - Initialize Prisma ORM with complete schema (`users`, `profiles`, `goals`, `food_items`, `meals`, `scans`, `subscriptions`).
@@ -61,35 +63,38 @@ flowchart TD
 ---
 
 ### Milestone 3: Nutrition Database & Core Catalog Service
+
 - **Scope:**
   - PostgreSQL full-text and trigram index configuration (`pg_trgm`) on `food_items`.
-  - Ingestion seed script for 500 common Indian regional dishes (ICMR-NIN dataset) and 1,000 USDA standard whole foods.
-  - Barcode lookup engine: queries Redis L2 cache -> PostgreSQL -> Open Food Facts API with auto-caching.
+  - Ingestion seed script for common regional dishes (verifying ICMR-NIN commercial licensing terms) and USDA standard whole foods.
+  - Barcode lookup engine: queries Redis L2 cache -> PostgreSQL -> Open Food Facts API with auto-caching and ODbL attribution compliance.
   - Endpoints: `GET /foods/search`, `GET /foods/barcode/:barcode`, `POST /foods/custom`.
 - **Dependencies:** Milestone 2.
 - **Acceptance Criteria:**
-  1. Trigram fuzzy search queries ("dal tadka", "paneer butter", "chapati") respond in < 80 ms with accurate results.
-  2. Scanning a known barcode returns verified nutritional facts within 150 ms (cache hit) or < 600 ms (Open Food Facts ingestion).
+  1. Trigram fuzzy search queries ("dal tadka", "paneer butter", "chapati") respond within design targets with accurate results.
+  2. Scanning a known barcode returns nutritional facts within target latency and complies with ODbL attribution requirements.
   3. Custom food creation correctly persists and is scoped strictly to the authoring user.
 
 ---
 
 ### Milestone 4: Multimodal AI Vision Food Pipeline
+
 - **Scope:**
   - S3-compatible storage integration (Cloudflare R2 / AWS S3) with presigned PUT upload URL generation.
-  - BullMQ background scan worker implementing `IVisionProvider` with Google Gemini 1.5 Flash.
-  - System prompt and structured JSON Schema enforcement for multi-item Indian and global food identification.
+  - BullMQ background scan worker implementing `IVisionProvider` with the selected multimodal vision model (verified against current provider documentation).
+  - System prompt and structured JSON Schema enforcement for multi-item food identification (treated as estimates with uncertainty).
   - Deterministic Nutrition Matcher reconciling visual detections against the PostgreSQL food catalog.
   - Endpoints: `POST /scans/presign-upload`, `POST /scans/:id/analyze`, `GET /scans/:id`.
 - **Dependencies:** Milestone 2, Milestone 3.
 - **Acceptance Criteria:**
   1. Presigned upload URLs expire after 300 seconds and enforce `image/jpeg` content-type lock.
-  2. Mock and live food photos (e.g. Indian thali) yield structured JSON items with cooking styles, portion units, and confidence scores in < 2.0 seconds.
+  2. Mock and live food photos yield structured JSON items with cooking styles, portion units, and confidence scores within design target latency.
   3. Matched items calculate exact calories and macros via deterministic database multiplication.
 
 ---
 
 ### Milestone 5: Mobile App Foundation & Design System
+
 - **Scope:**
   - Initialize pure React Native CLI project with TypeScript (Bridgeless / New Architecture enabled).
   - Configure React Navigation v7 with native stacks and bottom tab bar.
@@ -104,6 +109,7 @@ flowchart TD
 ---
 
 ### Milestone 6: Personal Onboarding & Goal Calculation Engine
+
 - **Scope:**
   - Multi-step animated onboarding wizard: Gender, DOB, Height, Weight, Activity Level, Goal, Diet Preference.
   - Live calculation preview displaying BMR, TDEE, and daily calorie/macro distribution.
@@ -118,10 +124,11 @@ flowchart TD
 ---
 
 ### Milestone 7: Food Logging Suite (Camera, Barcode, Manual)
+
 - **Scope:**
   - React Native Vision Camera integration with custom camera HUD (viewfinder, shutter button, gallery picker, flash toggle).
   - Client-side image compression down to < 250 KB and direct upload to S3 presigned URL.
-  - Interactive Scan Review Bottom Sheet: Item cards, confidence badges, serving unit selector (*katori*, *roti*, *grams*, *pieces*), richness toggles (*light oil* vs *rich*).
+  - Interactive Scan Review Bottom Sheet: Item cards, confidence badges, serving unit selector (_katori_, _roti_, _grams_, _pieces_), richness toggles (_light oil_ vs _rich_).
   - Barcode scanning camera mode powered by MLKit with instant audio/haptic feedback.
   - Fast search and manual food quick-log screens.
 - **Dependencies:** Milestone 4, Milestone 5, Milestone 6.
@@ -133,6 +140,7 @@ flowchart TD
 ---
 
 ### Milestone 8: Daily Nutrition Dashboard & Historical Diary
+
 - **Scope:**
   - Dynamic Calorie Ring showing remaining calories with smooth spring animation.
   - Macro progress bars (Protein, Carbs, Fat, Fiber) with target indicators.
@@ -148,6 +156,7 @@ flowchart TD
 ---
 
 ### Milestone 9: Weight & Water Tracking
+
 - **Scope:**
   - Weight logging screen with interactive historical trend chart.
   - Quick-add water tracker with animated water bottle / glass counter.
@@ -160,6 +169,7 @@ flowchart TD
 ---
 
 ### Milestone 10: Monetization, Hardening & Store Launch Readiness
+
 - **Scope:**
   - RevenueCat SDK integration for Apple In-App Purchase and Google Play Billing.
   - Free tier daily scan quota enforcement (3 scans/day) with Pro paywall modal.

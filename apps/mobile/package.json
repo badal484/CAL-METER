@@ -1,0 +1,10 @@
+{
+  "name": "@calmeter/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CAL METER React Native mobile client",
+  "scripts": {
+    "build": "echo 'Mobile build placeholder'",
+    "typecheck": "echo 'Mobile typecheck placeholder'"
+  }
+}

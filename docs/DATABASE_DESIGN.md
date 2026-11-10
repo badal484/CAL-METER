@@ -3,7 +3,7 @@
 **Document Version:** 1.0.0  
 **Status:** Approved Architecture Draft  
 **Owner:** Backend Architect & Database Administrator  
-**Last Updated:** November 2026  
+**Last Updated:** November 2026
 
 ---
 
@@ -486,10 +486,12 @@ model DeletionRequest {
 ## 3. Database Constraints, Indexes, & Performance Optimization
 
 ### 3.1. Compound Uniqueness & Tenant Protection
+
 - **`MealEntry(userId, date, mealType)`:** Enforces that a user has at most one record per meal slot per day. New items are appended to `MealFoodItem` linked to this canonical slot entry.
 - **`ServingUnitConversion(foodItemId, unitName)`:** Disallows duplicate unit definitions for the same food item.
 
 ### 3.2. Indexing Strategy
+
 - **`B-Tree on (userId, date)`:** Eliminates table scans when querying the daily nutrition dashboard or historical weekly views.
 - **`Hash / B-Tree on FoodItem(barcode)`:** Guarantees instantaneous $O(1)$ lookups during barcode scanning.
 - **`GIN Index on FoodItem(name, localNames)`:** Built using PostgreSQL `pg_trgm` (trigram) extension for fuzzy substring matching across regional Indian and English dishes.
@@ -498,7 +500,7 @@ model DeletionRequest {
 -- Trigram Index for Fuzzy Food Search
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE INDEX idx_food_items_name_trgm 
+CREATE INDEX idx_food_items_name_trgm
 ON food_items USING gin (name gin_trgm_ops);
 ```
 
@@ -508,7 +510,7 @@ ON food_items USING gin (name gin_trgm_ops);
 
 1. **Initial Baseline Migration:** Executed via `prisma migrate dev --name init_core_schema`.
 2. **Seed Pipeline (`prisma/seed.ts`):**
-   - Populates essential conversion matrices (*katori*, *roti*, *cup*, *scoop*, *piece*).
+   - Populates essential conversion matrices (_katori_, _roti_, _cup_, _scoop_, _piece_).
    - Ingests canonical reference datasets:
      - Top 500 common Indian regional recipes (from Indian Food Composition Tables / ICMR-NIN).
      - Top 1,000 standard whole foods from USDA FoodData Central (fruits, vegetables, meats, grains).

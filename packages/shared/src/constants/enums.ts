@@ -1,0 +1,95 @@
+export enum BiologicalSex {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+}
+
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  OTHER = 'OTHER',
+  PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY',
+}
+
+export enum ActivityLevel {
+  SEDENTARY = 'SEDENTARY',
+  LIGHTLY_ACTIVE = 'LIGHTLY_ACTIVE',
+  MODERATELY_ACTIVE = 'MODERATELY_ACTIVE',
+  VERY_ACTIVE = 'VERY_ACTIVE',
+  EXTRA_ACTIVE = 'EXTRA_ACTIVE',
+}
+
+export enum PrimaryGoal {
+  LOSE_WEIGHT = 'LOSE_WEIGHT',
+  MAINTAIN_WEIGHT = 'MAINTAIN_WEIGHT',
+  BUILD_MUSCLE = 'BUILD_MUSCLE',
+}
+
+export enum DietPreference {
+  ANY = 'ANY',
+  VEGETARIAN = 'VEGETARIAN',
+  VEGAN = 'VEGAN',
+  EGGETARIAN = 'EGGETARIAN',
+  JAIN = 'JAIN',
+  KETO = 'KETO',
+  HALAL = 'HALAL',
+}
+
+export enum UnitSystem {
+  METRIC = 'METRIC',
+  IMPERIAL = 'IMPERIAL',
+}
+
+export enum MealType {
+  BREAKFAST = 'BREAKFAST',
+  LUNCH = 'LUNCH',
+  DINNER = 'DINNER',
+  SNACK = 'SNACK',
+}
+
+export enum LoggedMethod {
+  AI_PHOTO = 'AI_PHOTO',
+  GALLERY_PHOTO = 'GALLERY_PHOTO',
+  BARCODE = 'BARCODE',
+  SEARCH = 'SEARCH',
+  MANUAL_ENTRY = 'MANUAL_ENTRY',
+  VOICE = 'VOICE',
+}
+
+export enum ScanStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
+
+export enum FoodSource {
+  USDA_FOOD_DATA_CENTRAL = 'USDA_FOOD_DATA_CENTRAL',
+  OPEN_FOOD_FACTS = 'OPEN_FOOD_FACTS',
+  ICMR_NIN_IFCT = 'ICMR_NIN_IFCT',
+  CUSTOM_USER = 'CUSTOM_USER',
+  VERIFIED_COMMUNITY = 'VERIFIED_COMMUNITY',
+}
+
+export enum SubscriptionStatus {
+  FREE = 'FREE',
+  TRIAL = 'TRIAL',
+  ACTIVE = 'ACTIVE',
+  PAST_DUE = 'PAST_DUE',
+  CANCELED = 'CANCELED',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum UserRole {
+  USER = 'USER',
+  ADMIN = 'ADMIN',
+  NUTRITIONIST = 'NUTRITIONIST',
+}
+
+export enum ServingProvenance {
+  ICMR_NIN_IFCT = 'ICMR_NIN_IFCT',
+  USDA = 'USDA',
+  OPEN_FOOD_FACTS = 'OPEN_FOOD_FACTS',
+  MANUFACTURER = 'MANUFACTURER',
+  USER_CONFIGURED = 'USER_CONFIGURED',
+  ESTIMATED_HOUSEHOLD = 'ESTIMATED_HOUSEHOLD',
+}

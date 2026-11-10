@@ -3,7 +3,7 @@
 **Document Version:** 1.0.0  
 **Status:** Approved Architecture Draft  
 **Owner:** Principal Software Architect & Technical Lead  
-**Last Updated:** November 2026  
+**Last Updated:** November 2026
 
 ---
 
@@ -12,6 +12,7 @@
 CAL METER adopts a **Modular Monolith** architecture organized inside a single TypeScript monorepo. This balances high engineering velocity, strict type safety, and zero deployment friction during early stages, while enforcing clean architectural boundaries that can be split into microservices if scaling demands dictate in the future.
 
 ### Key Architectural Tenets:
+
 1. **Single Source of Truth for Data Contracts:** The API, Worker, and Mobile Client share validation schemas, DTOs, and domain calculations via local packages (`@calmeter/contracts` and `@calmeter/shared`).
 2. **Decoupled Asynchronous Processing:** Resource-intensive workloads (AI image recognition, external catalog hydration, and third-party webhooks) are offloaded from the main Express HTTP thread to a dedicated BullMQ worker cluster backed by Redis.
 3. **Stateless API Services:** The API nodes maintain zero session state. Authentication is derived cryptographically from verified Firebase ID tokens; caching and transient state reside in Redis.
@@ -104,7 +105,7 @@ graph TB
 
     subgraph BackgroundProcessing["Worker Service (BullMQ)"]
         Worker[BullMQ Consumer Cluster]
-        GeminiClient[Google Gemini 1.5 Flash Vision Client]
+        VisionAI[Multimodal Vision Client]
         NutritionMatcher[Deterministic Nutrition Matching Engine]
     end
 
@@ -132,7 +133,7 @@ graph TB
 
     RedisCache --> Worker
     Worker --> S3
-    Worker --> GeminiClient
+    Worker --> VisionAI
     Worker --> NutritionMatcher
     NutritionMatcher --> PG
     NutritionMatcher --> USDA
@@ -149,6 +150,7 @@ graph TB
 ## 4. End-to-End Data Flows
 
 ### 4.1. AI Photo Scanning & Logging Sequence
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -158,7 +160,7 @@ sequenceDiagram
     participant S3 as S3 Object Storage
     participant Queue as Redis (BullMQ Queue)
     participant Worker as Worker Service
-    participant Gemini as Gemini 1.5 Flash
+    participant Vision as Multimodal Vision Provider
     participant DB as PostgreSQL DB
 
     User->>Client: Captures food photo
@@ -173,8 +175,8 @@ sequenceDiagram
 
     Worker->>Queue: Dequeue job
     Worker->>S3: Fetch optimized image buffer
-    Worker->>Gemini: Multimodal structured prompt (JSON Mode)
-    Gemini-->>Worker: Identified items, portions, cooking styles, confidence
+    Worker->>Vision: Multimodal structured prompt (JSON Mode)
+    Vision-->>Worker: Identified items, portions, cooking styles, confidence (estimates with uncertainty)
     Worker->>DB: Query FoodItem catalog for deterministic matches
     Worker->>DB: Persist ScanLog with detected & matched items
     Worker->>Queue: Mark job complete
@@ -190,6 +192,7 @@ sequenceDiagram
 ```
 
 ### 4.2. Barcode Scanning Flow
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -228,15 +231,15 @@ sequenceDiagram
 
 To preserve high API responsiveness, workloads are partitioned strictly based on execution time and external latency risks:
 
-| Workload Type | Processing Channel | Latency SLA | Failure Strategy |
-| :--- | :--- | :--- | :--- |
-| **Authentication & Profile Sync** | Synchronous (Express HTTP) | < 80 ms | Immediate HTTP 401 / 400 |
-| **Diary Query & Dashboard Calculation** | Synchronous (Express HTTP + Redis L2) | < 120 ms | Fallback to PostgreSQL read query |
-| **Manual & Barcode Food Search** | Synchronous (Postgres Full-Text + Redis) | < 100 ms | Partial matching fallback |
-| **AI Food Image Recognition** | Asynchronous (BullMQ Worker) | 1.5s - 2.5s | 3x retry with exponential backoff |
-| **RevenueCat Webhook Ingestion** | Asynchronous (BullMQ Worker) | < 500 ms (ack) | Instant 200 ACK to RevenueCat, job queued |
-| **User Data Purge / Export** | Asynchronous (BullMQ Worker) | < 30 seconds | Transactional multi-table cascade deletion |
-| **Expired Image Cleanup** | Asynchronous (BullMQ Cron) | Scheduled | Nightly purge of unconfirmed scan assets |
+| Workload Type                           | Processing Channel                       | Latency SLA    | Failure Strategy                           |
+| :-------------------------------------- | :--------------------------------------- | :------------- | :----------------------------------------- |
+| **Authentication & Profile Sync**       | Synchronous (Express HTTP)               | < 80 ms        | Immediate HTTP 401 / 400                   |
+| **Diary Query & Dashboard Calculation** | Synchronous (Express HTTP + Redis L2)    | < 120 ms       | Fallback to PostgreSQL read query          |
+| **Manual & Barcode Food Search**        | Synchronous (Postgres Full-Text + Redis) | < 100 ms       | Partial matching fallback                  |
+| **AI Food Image Recognition**           | Asynchronous (BullMQ Worker)             | 1.5s - 2.5s    | 3x retry with exponential backoff          |
+| **RevenueCat Webhook Ingestion**        | Asynchronous (BullMQ Worker)             | < 500 ms (ack) | Instant 200 ACK to RevenueCat, job queued  |
+| **User Data Purge / Export**            | Asynchronous (BullMQ Worker)             | < 30 seconds   | Transactional multi-table cascade deletion |
+| **Expired Image Cleanup**               | Asynchronous (BullMQ Cron)               | Scheduled      | Nightly purge of unconfirmed scan assets   |
 
 ---
 
@@ -245,17 +248,20 @@ To preserve high API responsiveness, workloads are partitioned strictly based on
 CAL METER leverages Redis 7 for three distinct operational tiers:
 
 ### 6.1. Dynamic User Caches
+
 - **Key Pattern:** `user:{userId}:summary:{YYYY-MM-DD}`
 - **Contents:** Cached total calories, macro progress, and meal IDs for the user's active day.
 - **TTL:** 1 hour.
 - **Invalidation Trigger:** Flushed immediately whenever any meal entry or food item for that date is created, updated, or deleted.
 
 ### 6.2. Food Catalog Caches
+
 - **Key Pattern:** `food:item:{foodId}`, `food:barcode:{barcode}`, `food:search:{sha256(query)}`
 - **Contents:** Serialized verified food nutrition contracts.
 - **TTL:** 24 hours for barcode items; 7 days for USDA/IFCT canonical items; 15 minutes for frequent search queries.
 
 ### 6.3. Distributed Rate Limiting & Semaphore Buckets
+
 - **Key Pattern:** `ratelimit:ip:{ip}`, `ratelimit:user:{userId}:scan`
 - **Engine:** Sliding window counter implemented via Redis sorted sets.
 - **Limits:** 100 general requests/min per IP; 10 scan requests/min per user (prevents bot abuse).

@@ -1,0 +1,63 @@
+import { describe, it, expect } from 'vitest';
+import { aggregateNutrients } from '../src/formulas/nutrient-aggregation.js';
+import { NutrientProfile } from '../src/types/index.js';
+
+describe('Nutrient Aggregation', () => {
+  it('correctly aggregates multiple food items in a meal', () => {
+    // Meal: Dal (180 kcal) + 2 Phulkas (150 kcal) + Salad (40 kcal)
+    const dal: NutrientProfile = {
+      calories: 180,
+      proteinGrams: 9,
+      carbsGrams: 24,
+      fatGrams: 5.5,
+      fiberGrams: 6,
+      micronutrients: { ironMg: 2.1, sodiumMg: 350 },
+    };
+
+    const rotis: NutrientProfile = {
+      calories: 150,
+      proteinGrams: 5.2,
+      carbsGrams: 30,
+      fatGrams: 0.8,
+      fiberGrams: 4.5,
+      micronutrients: { ironMg: 1.2, sodiumMg: 5 },
+    };
+
+    const salad: NutrientProfile = {
+      calories: 40,
+      proteinGrams: 1.5,
+      carbsGrams: 8,
+      fatGrams: 0.2,
+      fiberGrams: 3,
+      micronutrients: { sodiumMg: 20 },
+    };
+
+    const total = aggregateNutrients([dal, rotis, salad]);
+
+    // 180 + 150 + 40 = 370
+    expect(total.calories).toBe(370);
+    // 9 + 5.2 + 1.5 = 15.7
+    expect(total.proteinGrams).toBe(15.7);
+    // 24 + 30 + 8 = 62
+    expect(total.carbsGrams).toBe(62);
+    // 5.5 + 0.8 + 0.2 = 6.5
+    expect(total.fatGrams).toBe(6.5);
+    // 6 + 4.5 + 3 = 13.5
+    expect(total.fiberGrams).toBe(13.5);
+    // 2.1 + 1.2 = 3.3
+    expect(total.micronutrients?.ironMg).toBe(3.3);
+    // 350 + 5 + 20 = 375
+    expect(total.micronutrients?.sodiumMg).toBe(375);
+  });
+
+  it('handles empty food profile list gracefully', () => {
+    const total = aggregateNutrients([]);
+
+    expect(total.calories).toBe(0);
+    expect(total.proteinGrams).toBe(0);
+    expect(total.carbsGrams).toBe(0);
+    expect(total.fatGrams).toBe(0);
+    expect(total.fiberGrams).toBeUndefined();
+    expect(total.micronutrients).toBeUndefined();
+  });
+});

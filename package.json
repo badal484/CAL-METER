@@ -1,0 +1,30 @@
+{
+  "name": "cal-meter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI-powered calorie tracking and personal nutrition application for Android and iOS",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace=@calmeter/shared && npm run build --workspace=@calmeter/contracts",
+    "test": "npm run test --workspace=@calmeter/shared && npm run test --workspace=@calmeter/contracts",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspace=@calmeter/shared && npm run typecheck --workspace=@calmeter/contracts",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "eslint": "^9.14.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.13.0"
+  }
+}

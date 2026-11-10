@@ -4,13 +4,14 @@
 **Status:** Approved Architecture Draft  
 **Owner:** Backend Architect  
 **Base URL:** `https://api.calmeter.app/api/v1` (Production) / `http://localhost:4000/api/v1` (Local)  
-**Last Updated:** November 2026  
+**Last Updated:** November 2026
 
 ---
 
 ## 1. Global Conventions & Protocol Standards
 
 ### 1.1. Transport & Content Negotiation
+
 - **Protocol:** HTTPS / TLS 1.3 only (TLS 1.2 minimum acceptable).
 - **Format:** `application/json` for all request bodies and responses.
 - **Character Encoding:** UTF-8.
@@ -18,15 +19,19 @@
 - **Dates (calendar days):** ISO 8601 Date strings (`YYYY-MM-DD`).
 
 ### 1.2. Authentication & Authorization
+
 Every authenticated endpoint requires a Firebase ID Token in the HTTP Authorization header:
+
 ```http
 Authorization: Bearer <FIREBASE_ID_TOKEN>
 ```
+
 The API server validates the cryptographic signature against Google's public key certificate set, extracts `uid`, looks up the internal PostgreSQL `User` record, and binds the tenant context to `req.user`.
 
 ### 1.3. Standard Response Envelopes
 
 #### Success Envelope (`200 OK`, `201 Created`, `202 Accepted`)
+
 ```json
 {
   "success": true,
@@ -40,6 +45,7 @@ The API server validates the cryptographic signature against Google's public key
 ```
 
 #### Error Envelope (`4xx Client Errors`, `5xx Server Errors`)
+
 ```json
 {
   "success": false,
@@ -57,16 +63,17 @@ The API server validates the cryptographic signature against Google's public key
 ```
 
 ### 1.4. Standard Error Code Taxonomy
-| HTTP Code | Error Code | Description |
-| :--- | :--- | :--- |
-| `400` | `VALIDATION_ERROR` | Request payload failed Zod schema validation. |
-| `401` | `AUTH_UNAUTHORIZED` | Missing, malformed, or expired Bearer token. |
-| `403` | `FORBIDDEN_RESOURCE` | User attempted to access another tenant's record. |
-| `403` | `SUBSCRIPTION_REQUIRED` | Feature gated behind CAL METER Pro entitlement. |
-| `404` | `RESOURCE_NOT_FOUND` | Requested entity ID does not exist. |
-| `429` | `RATE_LIMIT_EXCEEDED` | Request threshold breached. Try again later. |
-| `429` | `DAILY_SCAN_LIMIT_REACHED` | Free tier daily AI scan quota reached (3 scans/day). |
-| `500` | `INTERNAL_SERVER_ERROR` | Unexpected server failure. Tracked in Sentry. |
+
+| HTTP Code | Error Code                 | Description                                          |
+| :-------- | :------------------------- | :--------------------------------------------------- |
+| `400`     | `VALIDATION_ERROR`         | Request payload failed Zod schema validation.        |
+| `401`     | `AUTH_UNAUTHORIZED`        | Missing, malformed, or expired Bearer token.         |
+| `403`     | `FORBIDDEN_RESOURCE`       | User attempted to access another tenant's record.    |
+| `403`     | `SUBSCRIPTION_REQUIRED`    | Feature gated behind CAL METER Pro entitlement.      |
+| `404`     | `RESOURCE_NOT_FOUND`       | Requested entity ID does not exist.                  |
+| `429`     | `RATE_LIMIT_EXCEEDED`      | Request threshold breached. Try again later.         |
+| `429`     | `DAILY_SCAN_LIMIT_REACHED` | Free tier daily AI scan quota reached (3 scans/day). |
+| `500`     | `INTERNAL_SERVER_ERROR`    | Unexpected server failure. Tracked in Sentry.        |
 
 ---
 
@@ -90,17 +97,21 @@ graph TD
 ### Module 1: Authentication & User Sync (`/auth`)
 
 #### `POST /auth/sync`
+
 Synchronizes the authenticated Firebase identity with the internal PostgreSQL database. Called immediately upon mobile app login/signup.
 
 - **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
+
 ```json
 {
   "email": "user@example.com",
   "name": "Rohan Sharma"
 }
 ```
+
 - **Response `200 OK`:**
+
 ```json
 {
   "success": true,
@@ -117,6 +128,7 @@ Synchronizes the authenticated Firebase identity with the internal PostgreSQL da
 ```
 
 #### `GET /auth/me`
+
 Retrieves current authenticated user session and subscription entitlement status.
 
 ---
@@ -124,12 +136,15 @@ Retrieves current authenticated user session and subscription entitlement status
 ### Module 2: Profile & Nutrition Goals (`/profile`, `/goals`)
 
 #### `GET /profile`
+
 Retrieves the user's biometric profile and dietary preferences.
 
 #### `PUT /profile`
+
 Updates user biometrics and recalculates baseline requirements.
 
 - **Request Body (Zod Validated):**
+
 ```json
 {
   "gender": "MALE",
@@ -147,11 +162,15 @@ Updates user biometrics and recalculates baseline requirements.
 ```
 
 #### `GET /goals`
+
 Returns current active daily calorie and macronutrient targets.
 
 #### `PUT /goals`
+
 Manual override of daily targets by user.
+
 - **Request Body:**
+
 ```json
 {
   "dailyCalories": 2100,
@@ -168,16 +187,20 @@ Manual override of daily targets by user.
 ### Module 3: Food Scans & Vision Engine (`/scans`)
 
 #### `POST /scans/presign-upload`
+
 Generates a short-lived presigned S3 PUT URL for direct image uploading. Checks daily scan quota prior to issuance.
 
 - **Request Body:**
+
 ```json
 {
   "contentType": "image/jpeg",
   "fileSizeBytes": 204850
 }
 ```
+
 - **Response `201 Created`:**
+
 ```json
 {
   "success": true,
@@ -191,10 +214,12 @@ Generates a short-lived presigned S3 PUT URL for direct image uploading. Checks 
 ```
 
 #### `POST /scans/:id/analyze`
+
 Dispatches the uploaded image to the BullMQ background queue for Gemini multimodal processing.
 
 - **Path Parameter:** `id` (UUID from presign step)
 - **Response `202 Accepted`:**
+
 ```json
 {
   "success": true,
@@ -207,9 +232,11 @@ Dispatches the uploaded image to the BullMQ background queue for Gemini multimod
 ```
 
 #### `GET /scans/:id`
+
 Polls analysis status or fetches final detected food items with matched nutritional data.
 
 - **Response `200 OK` (when status = "COMPLETED"):**
+
 ```json
 {
   "success": true,
@@ -263,12 +290,15 @@ Polls analysis status or fetches final detected food items with matched nutritio
 ### Module 4: Food Catalog & Search (`/foods`)
 
 #### `GET /foods/search?q={query}&page=1&limit=20`
+
 Searches verified foods, regional recipes, and user custom foods using fuzzy trigram indexing.
 
 #### `GET /foods/barcode/:barcode`
+
 Fetches verified packaged product by barcode (EAN/UPC). Queries Redis -> PostgreSQL -> Open Food Facts.
 
 #### `POST /foods/custom`
+
 Creates a private custom food item for the authenticated user.
 
 ---
@@ -276,9 +306,11 @@ Creates a private custom food item for the authenticated user.
 ### Module 5: Food Diary & Meal Entries (`/diary`)
 
 #### `GET /diary/:date`
+
 Fetches complete daily log for specified date (`YYYY-MM-DD`), including calorie budget calculations and individual meal breakdowns.
 
 - **Response `200 OK`:**
+
 ```json
 {
   "success": true,
@@ -325,8 +357,11 @@ Fetches complete daily log for specified date (`YYYY-MM-DD`), including calorie 
 ```
 
 #### `POST /diary/meals`
+
 Commits a verified meal (from AI scan or multi-item builder) to a meal slot.
+
 - **Request Body:**
+
 ```json
 {
   "date": "2026-11-10",
@@ -351,12 +386,15 @@ Commits a verified meal (from AI scan or multi-item builder) to a meal slot.
 ```
 
 #### `PUT /diary/items/:itemId`
+
 Updates the portion amount or serving unit of an existing logged food item. Automatically re-computes parent meal and daily totals.
 
 #### `DELETE /diary/items/:itemId`
+
 Deletes an individual food item.
 
 #### `DELETE /diary/meals/:id`
+
 Deletes an entire meal slot for that day.
 
 ---

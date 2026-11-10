@@ -1,0 +1,10 @@
+{
+  "name": "@calmeter/api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CAL METER Node.js and Express backend API",
+  "scripts": {
+    "build": "echo 'API build placeholder'",
+    "typecheck": "echo 'API typecheck placeholder'"
+  }
+}

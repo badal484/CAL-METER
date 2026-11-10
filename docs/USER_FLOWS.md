@@ -3,7 +3,7 @@
 **Document Version:** 1.0.0  
 **Status:** Approved Architecture Draft  
 **Owner:** Senior React Native Engineer & Product Designer  
-**Last Updated:** November 2026  
+**Last Updated:** November 2026
 
 ---
 
@@ -57,10 +57,12 @@ sequenceDiagram
 ```
 
 ### Guest Mode Contingency
+
 Users may tap "Explore as Guest". In this state:
+
 - An anonymous Firebase session is created silently.
 - Profile and logs are stored locally with cloud backup.
-- A subtle persistent banner appears on the Diary: *"Create an account to protect your data across devices."*
+- A subtle persistent banner appears on the Diary: _"Create an account to protect your data across devices."_
 - Tapping the banner triggers non-destructive account linking (`linkWithCredential`), preserving all logged history.
 
 ---
@@ -104,6 +106,7 @@ flowchart TD
 ```
 
 ### Interaction Details on the Review Screen:
+
 - **Visual Confidence Pills:**
   - `High Confidence` (Green dot): Item identified with > 85% certainty.
   - `Estimated Portion` (Amber dot): Multi-unit items where volume is estimated.
