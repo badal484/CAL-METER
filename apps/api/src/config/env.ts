@@ -12,7 +12,7 @@ const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
     TEST_DATABASE_URL: z.string().optional(),
     REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
-    CORS_ORIGIN: z.string().default('http://localhost:3000,http://localhost:8081'),
+    CORS_ORIGIN: z.string().default('http://localhost:3000,http://localhost:8081,http://localhost:5173'),
     MAX_REQUEST_SIZE: z.string().default('100kb'),
     TRUST_PROXY: z.string().default('false'),
     FIREBASE_CREDENTIAL_MODE: z.enum(['application-default', 'service-account']).optional(),
