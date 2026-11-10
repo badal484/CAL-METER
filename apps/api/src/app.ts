@@ -3,24 +3,30 @@ import { requestIdMiddleware } from './middleware/requestId.js';
 import { requestLoggerMiddleware } from './middleware/logger.js';
 import { createSecurityMiddleware } from './middleware/security.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
-import { rootRouter } from './routes/index.js';
+import { createRootRouter } from './routes/index.js';
 import type { IFirebaseTokenVerifier } from './lib/firebase.js';
-import { setFirebaseTokenVerifierForTesting } from './lib/firebase.js';
+import { getConfig, type ParsedTrustProxy } from './config/env.js';
 
 export interface CreateAppOptions {
+  verifier?: IFirebaseTokenVerifier;
   customVerifier?: IFirebaseTokenVerifier;
+  trustProxy?: ParsedTrustProxy;
   configureRoutes?: (app: Express) => void;
 }
 
 export function createApp(options?: CreateAppOptions): Express {
-  if (options?.customVerifier) {
-    setFirebaseTokenVerifierForTesting(options.customVerifier);
-  }
-
+  const config = getConfig();
   const app = express();
 
-  // Basic settings
-  app.set('trust proxy', 1);
+  // Explicit Reverse Proxy Trust Configuration (default disabled / false)
+  const effectiveTrustProxy =
+    options?.trustProxy !== undefined ? options.trustProxy : config.parsedTrustProxy;
+
+  if (effectiveTrustProxy !== false) {
+    app.set('trust proxy', effectiveTrustProxy);
+  } else {
+    app.set('trust proxy', false);
+  }
 
   // Request ID & Structured Logging Context
   app.use(requestIdMiddleware);
@@ -30,8 +36,10 @@ export function createApp(options?: CreateAppOptions): Express {
   const securityMiddlewares = createSecurityMiddleware();
   securityMiddlewares.forEach(middleware => app.use(middleware));
 
-  // Application Routes
-  app.use('/', rootRouter);
+  // Application Routes with injected dependencies
+  const verifier = options?.verifier ?? options?.customVerifier;
+  const router = createRootRouter({ verifier });
+  app.use('/', router);
 
   // Optional custom test routes hook before error handlers
   if (options?.configureRoutes) {

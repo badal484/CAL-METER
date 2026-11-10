@@ -324,3 +324,4 @@ model DeletionRequest {
 
   @@map("deletion_requests")
 }
+

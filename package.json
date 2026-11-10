@@ -21,9 +21,11 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "dev:api": "npm run dev --workspace=@calmeter/api",
     "dev:worker": "npm run dev --workspace=@calmeter/worker",
-    "prisma:generate": "prisma generate --schema=infrastructure/prisma/schema.prisma",
+    "prisma:generate": "DATABASE_URL=\"${DATABASE_URL:-postgresql://calmeter:calmeter@localhost:5432/calmeter_dev}\" prisma generate --schema=infrastructure/prisma/schema.prisma",
+    "prisma:validate": "DATABASE_URL=\"${DATABASE_URL:-postgresql://calmeter:calmeter@localhost:5432/calmeter_dev}\" prisma validate --schema=infrastructure/prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --schema=infrastructure/prisma/schema.prisma",
     "prisma:migrate:deploy": "prisma migrate deploy --schema=infrastructure/prisma/schema.prisma",
+    "prisma:migrate:test": "DATABASE_URL=\"${TEST_DATABASE_URL:-postgresql://calmeter:calmeter@localhost:5432/calmeter_test}\" prisma migrate deploy --schema=infrastructure/prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=infrastructure/prisma/schema.prisma"
   },
   "devDependencies": {

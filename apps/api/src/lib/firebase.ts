@@ -1,6 +1,11 @@
 import admin from 'firebase-admin';
-import { getConfig } from '../config/env.js';
-import { UnauthorizedError, DependencyUnavailableError } from './errors.js';
+import { getConfig, type ApiConfig } from '../config/env.js';
+import {
+  AppError,
+  UnauthorizedError,
+  DependencyUnavailableError,
+  InternalServerError,
+} from './errors.js';
 
 export interface DecodedToken {
   uid: string;
@@ -16,32 +21,38 @@ export interface IFirebaseTokenVerifier {
 
 let firebaseApp: admin.app.App | null = null;
 
-export function initializeFirebaseAdmin(): admin.app.App {
-  if (!firebaseApp) {
-    if (admin.apps.length > 0 && admin.apps[0]) {
-      firebaseApp = admin.apps[0];
-      return firebaseApp;
-    }
-
-    const config = getConfig();
-
-    if (config.FIREBASE_CLIENT_EMAIL && config.FIREBASE_PRIVATE_KEY) {
-      // Production service account initialization
-      const formattedKey = config.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-      firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: config.FIREBASE_PROJECT_ID,
-          clientEmail: config.FIREBASE_CLIENT_EMAIL,
-          privateKey: formattedKey,
-        }),
-      });
-    } else {
-      // Local development or application default credentials
-      firebaseApp = admin.initializeApp({
-        projectId: config.FIREBASE_PROJECT_ID,
-      });
-    }
+export function initializeFirebaseAdmin(config: ApiConfig = getConfig()): admin.app.App {
+  if (firebaseApp) {
+    return firebaseApp;
   }
+
+  if (admin.apps.length > 0 && admin.apps[0]) {
+    firebaseApp = admin.apps[0];
+    return firebaseApp;
+  }
+
+  if (config.FIREBASE_CREDENTIAL_MODE === 'service-account') {
+    if (!config.FIREBASE_CLIENT_EMAIL || !config.FIREBASE_PRIVATE_KEY) {
+      throw new Error(
+        '[Firebase Configuration Error] In service-account mode, both FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY must be provided.',
+      );
+    }
+    const formattedKey = config.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    firebaseApp = admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: config.FIREBASE_PROJECT_ID,
+        clientEmail: config.FIREBASE_CLIENT_EMAIL,
+        privateKey: formattedKey,
+      }),
+    });
+  } else {
+    // Explicit application-default credentials mode
+    firebaseApp = admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: config.FIREBASE_PROJECT_ID,
+    });
+  }
+
   return firebaseApp;
 }
 
@@ -55,6 +66,9 @@ export class FirebaseAdminTokenVerifier implements IFirebaseTokenVerifier {
   async verifyIdToken(token: string): Promise<DecodedToken> {
     try {
       const decoded = await this.app.auth().verifyIdToken(token);
+      if (!decoded.uid) {
+        throw new UnauthorizedError('Authentication token does not contain a valid user identity.');
+      }
       return {
         uid: decoded.uid,
         email: decoded.email,
@@ -62,32 +76,67 @@ export class FirebaseAdminTokenVerifier implements IFirebaseTokenVerifier {
         name: decoded.name,
       };
     } catch (err: unknown) {
-      const error = err as { code?: string; message?: string };
-      const code = error.code || '';
-
-      // Expired or invalid user credentials
-      if (
-        code === 'auth/id-token-expired' ||
-        code === 'auth/id-token-revoked' ||
-        code === 'auth/argument-error' ||
-        code === 'auth/invalid-id-token' ||
-        code === 'auth/user-disabled'
-      ) {
-        throw new UnauthorizedError('Authentication token is invalid or expired.');
+      if (err instanceof AppError) {
+        throw err;
       }
 
-      // Infrastructure or network service outages
+      const error = err as { code?: string; message?: string };
+      const code = (error.code || '').toLowerCase();
+      const message = (error.message || '').toLowerCase();
+
+      // 503 DEPENDENCY_UNAVAILABLE: Certificate fetch failures, network timeouts, infrastructure outages
       if (
-        code.includes('network') ||
-        code.includes('timeout') ||
+        code === 'auth/certificate-fetch-failed' ||
+        code === 'auth/network-request-failed' ||
+        code === 'auth/service-unavailable' ||
         code === 'auth/internal-error' ||
-        (error.message && error.message.includes('ECONNREFUSED'))
+        code.includes('timeout') ||
+        code.includes('network') ||
+        code.includes('unavailable') ||
+        code.includes('certificate') ||
+        message.includes('certificate') ||
+        message.includes('network') ||
+        message.includes('timeout') ||
+        message.includes('econnrefused') ||
+        message.includes('econnreset') ||
+        message.includes('etimedout') ||
+        message.includes('enotfound')
       ) {
         throw new DependencyUnavailableError('Authentication service temporarily unavailable.');
       }
 
-      // Default safe unauthorized error for unrecognized token issues
-      throw new UnauthorizedError('Authentication failed.');
+      // 401 AUTH_UNAUTHORIZED: Token expiration
+      if (code === 'auth/id-token-expired' || message.includes('expired')) {
+        throw new UnauthorizedError('Authentication token has expired.');
+      }
+
+      // 401 AUTH_UNAUTHORIZED: Token revocation
+      if (code === 'auth/id-token-revoked' || message.includes('revoked')) {
+        throw new UnauthorizedError('Authentication token has been revoked.');
+      }
+
+      // 401 AUTH_UNAUTHORIZED: Disabled user account
+      if (code === 'auth/user-disabled' || message.includes('disabled')) {
+        throw new UnauthorizedError('The user account has been disabled.');
+      }
+
+      // 401 AUTH_UNAUTHORIZED: Invalid signature, claims, or token format
+      if (
+        code === 'auth/invalid-id-token' ||
+        code === 'auth/argument-error' ||
+        code === 'auth/decoding-error' ||
+        code === 'auth/invalid-argument' ||
+        code.includes('signature') ||
+        message.includes('signature') ||
+        message.includes('invalid') ||
+        message.includes('malformed') ||
+        message.includes('claim')
+      ) {
+        throw new UnauthorizedError('Authentication token is invalid or malformed.');
+      }
+
+      // Safe fallback: Unknown errors must NOT automatically become 401. Classify safely as an internal server error.
+      throw new InternalServerError('An unexpected error occurred during authentication.');
     }
   }
 }
@@ -99,8 +148,4 @@ export function getFirebaseTokenVerifier(): IFirebaseTokenVerifier {
     defaultVerifier = new FirebaseAdminTokenVerifier();
   }
   return defaultVerifier;
-}
-
-export function setFirebaseTokenVerifierForTesting(verifier: IFirebaseTokenVerifier | null): void {
-  defaultVerifier = verifier;
 }

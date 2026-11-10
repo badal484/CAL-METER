@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { resetConfigForTesting, validateEnv } from '../src/config/env.js';
+import { resetConfigForTesting, validateEnv, parseTrustProxy } from '../src/config/env.js';
 
 describe('API Foundation Middleware & Server Behaviors', () => {
   it('app can be constructed without binding to a network port', () => {
@@ -77,6 +77,7 @@ describe('API Foundation Middleware & Server Behaviors', () => {
           DATABASE_URL: 'postgresql://calmeter:calmeter@localhost:5432/calmeter_prod',
           REDIS_URL: 'redis://localhost:6379',
           CORS_ORIGIN: 'https://calmeter.app',
+          FIREBASE_CREDENTIAL_MODE: 'application-default',
         });
         resetConfigForTesting(prodConfig);
 
@@ -101,7 +102,11 @@ describe('API Foundation Middleware & Server Behaviors', () => {
         expect(JSON.stringify(res.body)).not.toContain('secret123');
         expect(res.body.stack).toBeUndefined();
       } finally {
-        process.env.NODE_ENV = originalEnv;
+        if (originalEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = originalEnv;
+        }
         resetConfigForTesting();
       }
     });
@@ -150,9 +155,104 @@ describe('API Foundation Middleware & Server Behaviors', () => {
         expect(res.body.success).toBe(false);
         expect(res.body.error.code).toBe('PAYLOAD_TOO_LARGE');
       } finally {
-        process.env.MAX_REQUEST_SIZE = originalEnv;
+        if (originalEnv === undefined) {
+          delete process.env.MAX_REQUEST_SIZE;
+        } else {
+          process.env.MAX_REQUEST_SIZE = originalEnv;
+        }
         resetConfigForTesting();
       }
+    });
+  });
+
+  describe('Explicit Proxy Trust Configuration', () => {
+    describe('parseTrustProxy helper', () => {
+      it('parses falsy and disabled values to boolean false', () => {
+        expect(parseTrustProxy('false')).toBe(false);
+        expect(parseTrustProxy('0')).toBe(false);
+        expect(parseTrustProxy('')).toBe(false);
+        expect(parseTrustProxy('   ')).toBe(false);
+      });
+
+      it('parses "true" to boolean true', () => {
+        expect(parseTrustProxy('true')).toBe(true);
+        expect(parseTrustProxy('TRUE')).toBe(true);
+      });
+
+      it('parses valid numeric hop counts', () => {
+        expect(parseTrustProxy('1')).toBe(1);
+        expect(parseTrustProxy('2')).toBe(2);
+        expect(parseTrustProxy('10')).toBe(10);
+      });
+
+      it('preserves custom string proxy specifications', () => {
+        expect(parseTrustProxy('loopback, linklocal')).toBe('loopback, linklocal');
+        expect(parseTrustProxy('127.0.0.1')).toBe('127.0.0.1');
+      });
+    });
+
+    describe('Express App Proxy Trust Behavior', () => {
+      it('defaults to disabled (trust proxy = false) and ignores X-Forwarded-For', async () => {
+        const app = createApp({
+          configureRoutes: testApp => {
+            testApp.get('/ip-check', (req, res) => {
+              res.status(200).json({ ip: req.ip });
+            });
+          },
+        });
+
+        expect(app.get('trust proxy')).toBe(false);
+
+        const res = await request(app).get('/ip-check').set('X-Forwarded-For', '203.0.113.195');
+
+        expect(res.status).toBe(200);
+        // Untrusted proxy should not trust client-supplied X-Forwarded-For header
+        expect(res.body.ip).not.toBe('203.0.113.195');
+      });
+
+      it('honors explicitly configured single-hop proxy trust (trust proxy = 1)', async () => {
+        const app = createApp({
+          trustProxy: 1,
+          configureRoutes: testApp => {
+            testApp.get('/ip-check', (req, res) => {
+              res.status(200).json({ ip: req.ip });
+            });
+          },
+        });
+
+        expect(app.get('trust proxy')).toBe(1);
+
+        const res = await request(app).get('/ip-check').set('X-Forwarded-For', '203.0.113.195');
+
+        expect(res.status).toBe(200);
+        expect(res.body.ip).toBe('203.0.113.195');
+      });
+
+      it('honors full proxy trust when explicitly configured (trust proxy = true)', async () => {
+        const app = createApp({
+          trustProxy: true,
+          configureRoutes: testApp => {
+            testApp.get('/ip-check', (req, res) => {
+              res.status(200).json({ ip: req.ip });
+            });
+          },
+        });
+
+        expect(app.get('trust proxy')).toBe(true);
+
+        const res = await request(app).get('/ip-check').set('X-Forwarded-For', '198.51.100.42');
+
+        expect(res.status).toBe(200);
+        expect(res.body.ip).toBe('198.51.100.42');
+      });
+
+      it('honors string proxy specification (e.g. loopback)', () => {
+        const app = createApp({
+          trustProxy: 'loopback',
+        });
+
+        expect(app.get('trust proxy')).toBe('loopback');
+      });
     });
   });
 });

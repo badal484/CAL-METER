@@ -1,14 +1,24 @@
 import { Router } from 'express';
 import { healthRouter } from './health.routes.js';
-import { authRouter } from './auth.routes.js';
+import { createAuthRouter } from './auth.routes.js';
+import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 
-export const rootRouter = Router();
+export interface RouteOptions {
+  verifier?: IFirebaseTokenVerifier;
+}
 
-// Process & infrastructure liveness / readiness probes
-rootRouter.use('/', healthRouter);
+export function createRootRouter(options?: RouteOptions): Router {
+  const rootRouter = Router();
 
-// Version 1 API routes
-export const v1Router = Router();
-v1Router.use('/auth', authRouter);
+  // Process & infrastructure liveness / readiness probes
+  rootRouter.use('/', healthRouter);
 
-rootRouter.use('/api/v1', v1Router);
+  // Version 1 API routes
+  const v1Router = Router();
+  v1Router.use('/auth', createAuthRouter(options?.verifier));
+
+  rootRouter.use('/api/v1', v1Router);
+  return rootRouter;
+}
+
+export const rootRouter = createRootRouter();
