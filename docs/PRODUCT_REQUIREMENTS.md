@@ -286,3 +286,27 @@ _Note: Latency and throughput figures represent unverified engineering design ta
 | **Network Efficiency**  | Client-side image compression down to < 250 KB                  | Smooth performance over mobile networks.               |
 | **Security & Privacy**  | AES-256 at rest, TLS 1.3 in transit, zero plain-text biometrics | Strict compliance with DPDP Act (India) and GDPR (EU). |
 | **Crash-Free Sessions** | **Target: > 99.8% crash-free sessions** via Sentry              | Production consumer quality threshold.                 |
+
+---
+
+## 8. Notifications, Analytics & Production Hardening (Part 13)
+
+### 8.1. Push Notifications & Contextual Reminders
+
+- **FR-15.1 (Contextual Permissions):** The mobile application strictly avoids prompting for OS push permissions during cold initial launch. Permissions are requested contextually following meaningful user progress (e.g. completing onboarding setup or logging a first meal) accompanied by an educational rationale modal.
+- **FR-15.2 (Timezone-Aware Scheduling):** All reminder times (`HH:mm`) are evaluated against the user's local IANA timezone without hardcoded assumptions. Reminders handle daylight savings transitions cleanly.
+- **FR-15.3 (Do Not Disturb / Quiet Hours):** Default quiet window (`22:00` to `07:00`) automatically suppresses non-critical reminders to protect user sleep hygiene. Overnight windows spanning midnight are handled accurately. Critical account security notices bypass quiet hours.
+- **FR-15.4 (Deep Link Routing):** Notifications contain structured payload data resolving directly to target mobile screens (`calmeter://diary?meal=lunch`, `calmeter://progress?tab=water`, `calmeter://coach`, `calmeter://paywall`).
+- **FR-15.5 (Multi-Device Management & Deactivation):** Supports multiple active devices per user. Device tokens are promptly marked inactive upon user logout or account switch, preventing notification leakage.
+
+### 8.2. Product Analytics & Zero-PII Guarantee
+
+- **FR-16.1 (Privacy Filter):** All analytics event properties pass through a mandatory sanitization pipeline that strips authentication tokens, passwords, bearer credentials, email addresses, raw private meal notes, and private coach conversations before transmission or persistence.
+- **FR-16.2 (Event Taxonomy):** Centralized standard taxonomy covering critical funnels: user onboarding, diary logging, photo recognition, barcode scans, coach engagement, paywall impressions, and subscription conversions.
+- **FR-16.3 (Offline Resilient Batching):** Mobile client queues events locally and flushes in batches. Network failures fail open without disrupting user interaction or dropping events up to buffer capacity.
+
+### 8.3. Production Hardening & Observability
+
+- **FR-17.1 (Graceful Degradation):** If Redis or external AI providers experience outages, core diary logging and PostgreSQL food search operations continue functioning without throwing 500 errors.
+- **FR-17.2 (Tiered Rate Limiting):** Protects API endpoints against brute force and abuse with sliding-window throttles with automatic fallback to memory in event of cache unavailability.
+- **FR-17.3 (Operational Observability):** Real-time monitoring endpoints (`GET /health/metrics` and `GET /metrics`) surface P95 latency percentiles, memory consumption, HTTP status distribution, AI token consumption, and background worker queue depths in Prometheus and JSON formats.

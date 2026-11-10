@@ -42,3 +42,42 @@ export function createAuthMiddleware(
 }
 
 export const authenticate = createAuthMiddleware();
+
+export function createOptionalAuthMiddleware(
+  customVerifier?: IFirebaseTokenVerifier,
+): (req: Request, res: Response, next: NextFunction) => Promise<void> {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return next();
+      }
+
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer' || !parts[1]) {
+        return next();
+      }
+
+      const token = parts[1];
+      const verifier = customVerifier || getFirebaseTokenVerifier();
+      const decoded = await verifier.verifyIdToken(token);
+
+      if (decoded && decoded.uid) {
+        req.user = {
+          uid: decoded.uid,
+          email: decoded.email,
+          emailVerified: decoded.emailVerified,
+          name: decoded.name,
+        };
+      }
+
+      next();
+    } catch {
+      // Optional auth: proceed unauthenticated on invalid token
+      next();
+    }
+  };
+}
+
+export const authenticateOptional = createOptionalAuthMiddleware();
+export const requireAuth = authenticate;

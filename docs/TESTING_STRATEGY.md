@@ -334,3 +334,56 @@ Part 12 implements end-to-end testing across shared entitlement formulas, contra
 - **`ManageSubscriptionView` Component:**
   - Renders Free Plan badge and upgrade CTA for free users.
   - Renders Premium badge and renewal date for active subscribers.
+
+---
+
+## 10. Notifications, Analytics & Production Hardening Test Suite (Part 13)
+
+### 10.1. Timezone & Sanitization Unit Tests (`packages/shared/tests/`)
+
+- **`timezone.test.ts`:**
+  - `parseTimeToMinutes` and `formatMinutesToTime`: Verifies accurate conversions, boundary edge cases (00:00 to 23:59), wrapping, and invalid time string rejections.
+  - `isWithinQuietHours`: Verifies same-day quiet windows (`13:00` to `15:00`), midnight-crossing quiet windows (`22:00` to `07:00`), unconfigured preferences, and equal start/end edge cases.
+  - `isValidIanaTimezone`: Validates common Indian (`Asia/Kolkata`) and global timezones (`America/New_York`, `UTC`, `Europe/London`), rejecting corrupted strings.
+  - `getCurrentTimeInTimezone`: Verifies timezone calculation, day boundary transitions, and fallback to UTC.
+  - `isReminderDue`: Verifies window matching and midnight wrap-around tolerance.
+- **`analyticsSanitizer.test.ts`:**
+  - `isSensitiveKey`: Verifies detection of passwords, secrets, tokens, auth headers, private medical notes, and coach messages.
+  - `sanitizeAnalyticsProperties`: Verifies that blocked keys are redacted to `[REDACTED]`, embedded emails to `[REDACTED_EMAIL]`, JWTs to `[REDACTED_TOKEN]`, and deep objects/arrays are safely cleaned.
+
+### 10.2. Contract Validation (`packages/contracts/tests/contracts.test.ts`)
+
+- **Device Token Contracts:** Validates `RegisterDeviceTokenSchema` with platform and hardware version constraints.
+- **Notification Preference Contracts:** Validates `NotificationPreferenceSchema` with custom reminder times (`HH:mm`), quiet hours, and regex constraints.
+- **Analytics Contracts:** Validates `TrackAnalyticsEventSchema` and `BatchAnalyticsEventsSchema`.
+- **Operational Metrics Contracts:** Validates `OperationalMetricsResponseSchema` structure including memory, HTTP latencies, and AI counters.
+
+### 10.3. Backend Integration & Observability (`apps/api/tests/`)
+
+- **`notifications.test.ts`:**
+  - `POST /api/v1/notifications/device-token`: Registers active device token and updates metadata idempotently.
+  - `DELETE /api/v1/notifications/device-token`: Deactivates token on logout.
+  - `GET /api/v1/notifications/preferences` & `PATCH`: Fetches defaults, updates custom reminder times and quiet hours, rejects invalid formats.
+  - `POST /api/v1/notifications/test`: Dispatches mock notification, logs delivery history, and honors quiet hours / category disabling.
+- **`analytics.test.ts`:**
+  - `POST /api/v1/analytics/track`: Ingests event, proves zero-PII scrubbing in database record, and verifies anonymous pre-auth events.
+  - `POST /api/v1/analytics/batch`: Ingests mobile event batches in bulk.
+  - `GET /api/v1/metrics`: Surfaces JSON operational telemetry and Prometheus plaintext exposition format.
+- **`securityHardening.test.ts`:**
+  - `createRateLimiter`: Verifies request throttling with 429 status, `Retry-After`, and `X-RateLimit-*` headers.
+  - Security headers: Emits Helmet security headers (`X-Content-Type-Options: nosniff`).
+  - CORS policies: Blocks unauthorized cross-origin preflight requests with `403 Forbidden`.
+
+### 10.4. Background Worker Queues & Processors (`apps/worker/tests/worker.test.ts`)
+
+- **`notification.queue.ts`:** Instantiates BullMQ queue with exponential backoff retry policy.
+- **Deduplication:** Verifies deterministic job ID generation (`notif-${userId}-${category}-${dateIso}`) to eliminate duplicate alerts.
+- **Processor:** Verifies `processNotificationJob` checks preferences, quiet hours, and dispatches without error.
+
+### 10.5. Mobile UI & Services (`apps/mobile/tests/`)
+
+- **`notifications.test.tsx`:**
+  - `PushNotificationService`: Verifies token registration, logout deactivation, and deep link routing for `calmeter://diary`, `calmeter://progress`, `calmeter://coach`, and `calmeter://paywall`.
+  - `NotificationPreferencesView`: Renders reminder switches, quiet hours inputs, and verifies preference save interactions.
+- **`analytics.test.tsx`:**
+  - `AnalyticsService`: Enqueues events with PII sanitization, flushes batches to backend, and handles offline network interruptions without crashing UI.

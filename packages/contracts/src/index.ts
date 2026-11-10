@@ -9,3 +9,6 @@ export * from './tracking.contract.js';
 export * from './barcode.contract.js';
 export * from './coach.contract.js';
 export * from './subscription.contract.js';
+export * from './notification.contract.js';
+export * from './analytics.contract.js';
+export * from './metrics.contract.js';

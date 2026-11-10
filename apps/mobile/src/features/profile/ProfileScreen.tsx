@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Sparkles,
   X,
+  Bell,
 } from 'lucide-react-native';
 import { ProfileApiClient } from '../../services/profileApi';
 import { GoalApiClient } from '../../services/goalApi';
@@ -20,6 +21,7 @@ import type { UserProfileDto, NutritionGoalDto } from '@calmeter/contracts';
 import { PrimaryGoal, ActivityLevel } from '@calmeter/shared';
 import { OnboardingFlow } from '../onboarding/OnboardingFlow';
 import { ManageSubscriptionView } from '../subscription/ManageSubscriptionView';
+import { NotificationPreferencesView } from './NotificationPreferencesView';
 
 export interface ProfileScreenProps {
   profileClient?: ProfileApiClient;
@@ -43,6 +45,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [editBiometricsModal, setEditBiometricsModal] = useState(false);
   const [editGoalModal, setEditGoalModal] = useState(false);
   const [customizeModal, setCustomizeModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
 
   // Edit Biometrics Draft
@@ -491,6 +494,36 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* APP PREFERENCES */}
         <SectionHeader title="Preferences" style={{ marginBottom: spacing.xs }} />
 
+        <Pressable
+          onPress={() => setShowNotificationModal(true)}
+          style={[
+            styles.menuItem,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+              borderRadius: radii.md,
+              marginBottom: spacing.xs,
+              padding: spacing.md,
+            },
+          ]}
+          testID="btn-notification-preferences"
+        >
+          <View style={styles.inlineRow}>
+            <Bell size={20} color={colors.textPrimary} />
+            <View style={{ marginLeft: spacing.md, flex: 1 }}>
+              <Text
+                style={[typography.bodyMedium, { color: colors.textPrimary, fontWeight: '500' }]}
+              >
+                Notifications & Reminders
+              </Text>
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                Meal check-ins, hydration, quiet hours
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.textTertiary} />
+          </View>
+        </Pressable>
+
         <Card
           style={[
             styles.menuItem,
@@ -749,6 +782,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             />
           </Card>
         </View>
+      </Modal>
+
+      {/* NOTIFICATION PREFERENCES MODAL */}
+      <Modal
+        visible={showNotificationModal}
+        animationType="slide"
+        onRequestClose={() => setShowNotificationModal(false)}
+      >
+        <NotificationPreferencesView onClose={() => setShowNotificationModal(false)} />
       </Modal>
     </ScreenContainer>
   );

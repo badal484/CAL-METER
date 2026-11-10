@@ -12,8 +12,12 @@ import { createTrackingRouter } from './tracking.routes.js';
 import { createCoachRouter } from './coach.routes.js';
 import { createSubscriptionRouter } from './subscription.routes.js';
 import { createWebhookRouter } from './webhook.routes.js';
+import { createNotificationRoutes } from './notification.routes.js';
+import { createAnalyticsRoutes } from './analytics.routes.js';
+import { createMetricsRoutes } from './metrics.routes.js';
 import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 import type { BarcodeLookupService } from '../services/barcode/barcodeLookup.service.js';
+import type { IPushNotificationProvider } from '../services/notificationDispatcher.service.js';
 
 export interface RouteOptions {
   verifier?: IFirebaseTokenVerifier;
@@ -23,6 +27,9 @@ export interface RouteOptions {
   coachRouter?: Router;
   subscriptionRouter?: Router;
   webhookRouter?: Router;
+  notificationRouter?: Router;
+  analyticsRouter?: Router;
+  pushProvider?: IPushNotificationProvider;
 }
 
 export function createRootRouter(options?: RouteOptions): Router {
@@ -81,8 +88,27 @@ export function createRootRouter(options?: RouteOptions): Router {
     '/webhooks',
     options?.webhookRouter || createWebhookRouter({ prisma: options?.prisma }),
   );
+  v1Router.use(
+    '/notifications',
+    options?.notificationRouter ||
+      createNotificationRoutes({
+        verifier: options?.verifier,
+        prisma: options?.prisma,
+        pushProvider: options?.pushProvider,
+      }),
+  );
+  v1Router.use(
+    '/analytics',
+    options?.analyticsRouter ||
+      createAnalyticsRoutes({
+        verifier: options?.verifier,
+        prisma: options?.prisma,
+      }),
+  );
+  v1Router.use('/metrics', createMetricsRoutes());
 
   rootRouter.use('/api/v1', v1Router);
+
   return rootRouter;
 }
 

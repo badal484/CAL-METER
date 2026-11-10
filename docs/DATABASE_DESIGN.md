@@ -1154,3 +1154,88 @@ ON food_items USING gin (name gin_trgm_ops);
      - Top 500 common Indian regional recipes (from Indian Food Composition Tables / ICMR-NIN).
      - Top 1,000 standard whole foods from USDA FoodData Central (fruits, vegetables, meats, grains).
 3. **Database Maintenance:** Nightly automated vacuuming and index re-indexing scheduled during low-traffic windows (03:00 UTC).
+
+---
+
+## 5. Notifications, Analytics & Production Observability Models (Part 13)
+
+### 5.1. Schema Entities
+
+#### 1. DeviceToken (`device_tokens`)
+
+Stores Firebase Cloud Messaging (FCM) registration tokens with device hardware metadata and multi-device support per user account.
+
+| Column         | Type             | Constraints                      | Description                                  |
+| :------------- | :--------------- | :------------------------------- | :------------------------------------------- |
+| `id`           | `UUID`           | PK, Default `gen_random_uuid()`  | Unique device registration identifier        |
+| `user_id`      | `UUID`           | FK `users.id`, ON DELETE CASCADE | Associated authenticated user                |
+| `token`        | `VARCHAR(512)`   | UNIQUE, NOT NULL                 | Device push registration token               |
+| `platform`     | `DevicePlatform` | NOT NULL, DEFAULT `'ANDROID'`    | `IOS`, `ANDROID`, `WEB`                      |
+| `device_model` | `VARCHAR(100)`   | NULLABLE                         | Client hardware model (e.g. Pixel 8)         |
+| `os_version`   | `VARCHAR(50)`    | NULLABLE                         | Operating system version                     |
+| `app_version`  | `VARCHAR(50)`    | NULLABLE                         | Client application build version             |
+| `is_active`    | `BOOLEAN`        | NOT NULL, DEFAULT `true`         | Active status (false on logout/unregistered) |
+| `last_seen_at` | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`        | Timestamp of last heartbeat/token update     |
+| `created_at`   | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`        | Initial registration timestamp               |
+| `updated_at`   | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`        | Last modification timestamp                  |
+
+#### 2. NotificationPreference (`notification_preferences`)
+
+Per-user notification scheduling, category switches, water reminder intervals, and timezone-aware quiet hours.
+
+| Column                 | Type          | Constraints                              | Description                                |
+| :--------------------- | :------------ | :--------------------------------------- | :----------------------------------------- |
+| `id`                   | `UUID`        | PK, Default `gen_random_uuid()`          | Unique preference identifier               |
+| `user_id`              | `UUID`        | UNIQUE, FK `users.id`, ON DELETE CASCADE | 1-to-1 association with user account       |
+| `enabled`              | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Master notifications switch                |
+| `meal_reminders`       | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Master switch for meal check-in prompts    |
+| `breakfast_reminder`   | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Breakfast reminder switch                  |
+| `lunch_reminder`       | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Lunch reminder switch                      |
+| `dinner_reminder`      | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Dinner reminder switch                     |
+| `water_reminders`      | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Periodic hydration reminder switch         |
+| `daily_summary`        | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Evening nutrition balance recap switch     |
+| `weekly_summary`       | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Weekly progress review switch              |
+| `weight_reminders`     | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Morning weigh-in reminder switch           |
+| `coach_insights`       | `BOOLEAN`     | NOT NULL, DEFAULT `true`                 | Proactive coach tip notifications          |
+| `breakfast_time`       | `VARCHAR(5)`  | NOT NULL, DEFAULT `'08:30'`              | User local breakfast reminder (`HH:mm`)    |
+| `lunch_time`           | `VARCHAR(5)`  | NOT NULL, DEFAULT `'13:00'`              | User local lunch reminder (`HH:mm`)        |
+| `dinner_time`          | `VARCHAR(5)`  | NOT NULL, DEFAULT `'20:00'`              | User local dinner reminder (`HH:mm`)       |
+| `daily_summary_time`   | `VARCHAR(5)`  | NOT NULL, DEFAULT `'21:30'`              | User local evening summary (`HH:mm`)       |
+| `weight_reminder_time` | `VARCHAR(5)`  | NOT NULL, DEFAULT `'08:00'`              | User local weight reminder (`HH:mm`)       |
+| `water_interval_hours` | `INTEGER`     | NOT NULL, DEFAULT `2`                    | Interval between hydration prompts (1-12h) |
+| `quiet_hours_start`    | `VARCHAR(5)`  | DEFAULT `'22:00'`                        | Sleep quiet window start (`HH:mm`)         |
+| `quiet_hours_end`      | `VARCHAR(5)`  | DEFAULT `'07:00'`                        | Sleep quiet window end (`HH:mm`)           |
+| `timezone`             | `VARCHAR(64)` | NOT NULL, DEFAULT `'Asia/Kolkata'`       | User IANA timezone string                  |
+
+#### 3. NotificationHistory (`notification_history`)
+
+Auditable record of dispatched push alerts with delivery status and device counts.
+
+| Column           | Type                         | Constraints                      | Description                                                              |
+| :--------------- | :--------------------------- | :------------------------------- | :----------------------------------------------------------------------- |
+| `id`             | `UUID`                       | PK, Default `gen_random_uuid()`  | Unique delivery record ID                                                |
+| `user_id`        | `UUID`                       | FK `users.id`, ON DELETE CASCADE | Recipient user                                                           |
+| `category`       | `NotificationCategory`       | NOT NULL                         | Categorical reminder type                                                |
+| `title`          | `VARCHAR(200)`               | NOT NULL                         | Rendered notification title                                              |
+| `body`           | `TEXT`                       | NOT NULL                         | Rendered notification message                                            |
+| `data`           | `JSONB`                      | NULLABLE                         | Deep link route and payload parameters                                   |
+| `status`         | `NotificationDeliveryStatus` | NOT NULL, DEFAULT `'PENDING'`    | `PENDING`, `SENT`, `FAILED`, `SKIPPED_QUIET_HOURS`, `SKIPPED_PREFERENCE` |
+| `device_count`   | `INTEGER`                    | NOT NULL, DEFAULT `0`            | Number of devices successfully targeted                                  |
+| `failure_reason` | `TEXT`                       | NULLABLE                         | Error message if dispatch failed                                         |
+| `sent_at`        | `TIMESTAMPTZ(6)`             | NULLABLE                         | Exact delivery timestamp                                                 |
+| `created_at`     | `TIMESTAMPTZ(6)`             | NOT NULL, DEFAULT `NOW()`        | Record creation timestamp                                                |
+
+#### 4. AnalyticsEvent (`analytics_events`)
+
+Anonymized, privacy-scrubbed product analytics event store.
+
+| Column            | Type             | Constraints                       | Description                            |
+| :---------------- | :--------------- | :-------------------------------- | :------------------------------------- |
+| `id`              | `UUID`           | PK, Default `gen_random_uuid()`   | Unique event ID                        |
+| `user_id`         | `UUID`           | FK `users.id`, ON DELETE SET NULL | Optional user UUID (null for pre-auth) |
+| `event_name`      | `VARCHAR(100)`   | NOT NULL                          | Standard taxonomy event identifier     |
+| `properties`      | `JSONB`          | NOT NULL                          | Sanitized zero-PII event metadata      |
+| `device_platform` | `VARCHAR(20)`    | NULLABLE                          | `ANDROID`, `IOS`, `WEB`                |
+| `app_version`     | `VARCHAR(50)`    | NULLABLE                          | Client version string                  |
+| `session_id`      | `VARCHAR(100)`   | NULLABLE                          | Anonymous session token                |
+| `timestamp`       | `TIMESTAMPTZ(6)` | NOT NULL, DEFAULT `NOW()`         | Event occurrence time                  |

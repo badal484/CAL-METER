@@ -95,4 +95,65 @@ describe('BullMQ Worker Foundation & Queue Lifecycle', () => {
       workerRedis.disconnect();
     }
   });
+
+  describe('Notification Dispatch Worker & Deduplication (Part 13)', () => {
+    it('instantiates notification queue with exponential retry policy', async () => {
+      const { createNotificationQueue, NOTIFICATION_QUEUE_NAME, defaultNotificationJobOptions } =
+        await import('../src/queues/notification.queue.js');
+
+      const notifQueue = createNotificationQueue(redis);
+      expect(notifQueue.name).toBe(NOTIFICATION_QUEUE_NAME);
+      expect(defaultNotificationJobOptions.attempts).toBe(3);
+      expect(defaultNotificationJobOptions.backoff).toEqual({
+        type: 'exponential',
+        delay: 3000,
+      });
+
+      await notifQueue.close();
+    });
+
+    it('enqueues notification job with deterministic deduplication jobId', async () => {
+      const { createNotificationQueue, enqueueNotificationJob } =
+        await import('../src/queues/notification.queue.js');
+      const { NotificationCategory } = await import('@calmeter/shared');
+
+      const notifQueue = createNotificationQueue(redis);
+      const jobData = {
+        userId: 'test-user-uuid',
+        category: NotificationCategory.MEAL_REMINDER_BREAKFAST,
+        title: 'Time for breakfast!',
+        body: 'Log your morning meal to stay on target.',
+        dateIso: '2026-11-10',
+      };
+
+      const job = await enqueueNotificationJob(notifQueue, jobData);
+      expect(job.id).toBe('notif-test-user-uuid-meal-reminder-breakfast-2026-11-10');
+      expect(job.data.category).toBe(NotificationCategory.MEAL_REMINDER_BREAKFAST);
+
+      await job.remove();
+      await notifQueue.close();
+    });
+
+    it('processes notification job gracefully in mock environment', async () => {
+      const { processNotificationJob } =
+        await import('../src/processors/notification.processor.js');
+      const { NotificationCategory, NotificationDeliveryStatus } = await import('@calmeter/shared');
+
+      const mockJob = {
+        id: 'mock-job-id',
+        data: {
+          userId: 'mock-user-uuid',
+          category: NotificationCategory.WATER_REMINDER,
+          title: 'Hydration Check',
+          body: 'Drink a glass of water.',
+          dateIso: '2026-11-10',
+        },
+        attemptsMade: 0,
+      } as any;
+
+      const result = await processNotificationJob(mockJob);
+      expect(result.status).toBe(NotificationDeliveryStatus.SENT);
+      expect(result.deviceCount).toBe(1);
+    });
+  });
 });

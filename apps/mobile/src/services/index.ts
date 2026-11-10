@@ -8,3 +8,6 @@ export * from './trackingApi.js';
 export * from './coachApi.js';
 export * from './subscriptionApi.js';
 export * from './revenueCatService.js';
+export * from './notificationApi.js';
+export * from './pushNotificationService.js';
+export * from './analyticsService.js';

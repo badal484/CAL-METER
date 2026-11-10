@@ -9,6 +9,12 @@ import {
   type FoodScanJobResult,
 } from './queues/scan.queue.js';
 import { processFoodScanJob } from './processors/scan.processor.js';
+import {
+  NOTIFICATION_QUEUE_NAME,
+  type NotificationJobData,
+  type NotificationJobResult,
+} from './queues/notification.queue.js';
+import { processNotificationJob } from './processors/notification.processor.js';
 
 export function createFoodScanWorker(
   connection?: Redis,
@@ -37,34 +43,78 @@ export function createFoodScanWorker(
   });
 
   worker.on('error', err => {
-    workerLogger.error({ err: err.message }, 'BullMQ worker encountered an error');
+    workerLogger.error({ err: err.message }, 'BullMQ scan worker encountered an error');
   });
 
   return worker;
 }
 
-let activeWorker: Worker<FoodScanJobData, FoodScanJobResult> | null = null;
+export function createNotificationWorker(
+  connection?: Redis,
+): Worker<NotificationJobData, NotificationJobResult> {
+  const config = getWorkerConfig();
+  const redisConn = connection || createWorkerRedisConnection();
+
+  const worker = new Worker<NotificationJobData, NotificationJobResult>(
+    NOTIFICATION_QUEUE_NAME,
+    processNotificationJob,
+    {
+      connection: redisConn,
+      concurrency: config.CONCURRENCY,
+    },
+  );
+
+  worker.on('completed', (job, result) => {
+    workerLogger.info({ jobId: job.id, result }, 'Notification job completed successfully');
+  });
+
+  worker.on('failed', (job, err) => {
+    workerLogger.error(
+      { jobId: job?.id, attemptsMade: job?.attemptsMade, err: err.message },
+      'Notification job failed',
+    );
+  });
+
+  worker.on('error', err => {
+    workerLogger.error({ err: err.message }, 'BullMQ notification worker encountered an error');
+  });
+
+  return worker;
+}
+
+let activeScanWorker: Worker<FoodScanJobData, FoodScanJobResult> | null = null;
+let activeNotificationWorker: Worker<NotificationJobData, NotificationJobResult> | null = null;
 let activeRedis: Redis | null = null;
 
-export async function startWorkerApp(): Promise<Worker<FoodScanJobData, FoodScanJobResult>> {
-  workerLogger.info('Starting CAL METER background worker...');
+export async function startWorkerApp() {
+  workerLogger.info('Starting CAL METER background workers...');
   activeRedis = createWorkerRedisConnection();
-  activeWorker = createFoodScanWorker(activeRedis);
+  activeScanWorker = createFoodScanWorker(activeRedis);
+  activeNotificationWorker = createNotificationWorker(activeRedis);
 
   workerLogger.info(
-    { queue: FOOD_SCAN_QUEUE_NAME },
-    'CAL METER background worker is active and listening for jobs',
+    { queues: [FOOD_SCAN_QUEUE_NAME, NOTIFICATION_QUEUE_NAME] },
+    'CAL METER background workers are active and listening for jobs',
   );
-  return activeWorker;
+  return {
+    scanWorker: activeScanWorker,
+    notificationWorker: activeNotificationWorker,
+  };
 }
 
 export async function stopWorkerApp(): Promise<void> {
-  workerLogger.info('Initiating graceful shutdown of background worker...');
+  workerLogger.info('Initiating graceful shutdown of background workers...');
 
-  if (activeWorker) {
-    await activeWorker.close();
-    activeWorker = null;
-    workerLogger.info('BullMQ worker closed.');
+  if (activeScanWorker) {
+    await activeScanWorker.close();
+    activeScanWorker = null;
+    workerLogger.info('BullMQ scan worker closed.');
+  }
+
+  if (activeNotificationWorker) {
+    await activeNotificationWorker.close();
+    activeNotificationWorker = null;
+    workerLogger.info('BullMQ notification worker closed.');
   }
 
   if (activeRedis) {

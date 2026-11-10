@@ -1440,4 +1440,194 @@ describe('Contracts Runtime Schema Validation', () => {
       expect(FeatureLimitExceededErrorSchema.safeParse(err).success).toBe(true);
     });
   });
+
+  describe('Subscriptions, Payments & Entitlements Contracts (Part 12)', () => {
+    it('validates SubscriptionStatusResponseSchema', async () => {
+      const { SubscriptionStatusResponseSchema } = await import('../src/subscription.contract.js');
+      const { SubscriptionTier, SubscriptionStatus, SubscriptionStore, FeatureKey } =
+        await import('@calmeter/shared');
+
+      const payload = {
+        tier: SubscriptionTier.PREMIUM,
+        status: SubscriptionStatus.ACTIVE,
+        store: SubscriptionStore.APP_STORE,
+        planId: 'monthly_premium',
+        productId: 'com.calmeter.premium.monthly',
+        entitlements: ['premium_access'],
+        expiresAt: '2026-12-10T12:00:00.000Z',
+        autoRenewStatus: true,
+        isSandbox: false,
+        billingIssue: false,
+        cancelReason: null,
+        dailyUsage: {
+          [FeatureKey.AI_PHOTO_SCAN]: { count: 3, limit: 50, remaining: 47 },
+        },
+      };
+
+      expect(SubscriptionStatusResponseSchema.safeParse(payload).success).toBe(true);
+    });
+
+    it('validates RevenueCatWebhookPayloadSchema structure', async () => {
+      const { RevenueCatWebhookPayloadSchema } = await import('../src/subscription.contract.js');
+
+      const webhookData = {
+        api_version: '1.0',
+        event: {
+          id: 'evt_123456789',
+          type: 'INITIAL_PURCHASE',
+          app_user_id: 'user_uuid_abc',
+          product_id: 'com.calmeter.premium.annual',
+          entitlement_id: 'premium_access',
+          period_type: 'NORMAL',
+          purchased_at_ms: 1731234567000,
+          expiration_at_ms: 1762770567000,
+          environment: 'SANDBOX',
+          store: 'APP_STORE',
+          event_timestamp_ms: 1731234567000,
+        },
+      };
+
+      expect(RevenueCatWebhookPayloadSchema.safeParse(webhookData).success).toBe(true);
+    });
+
+    it('validates FeatureLimitExceededErrorSchema', async () => {
+      const { FeatureLimitExceededErrorSchema } = await import('../src/subscription.contract.js');
+      const { FeatureKey } = await import('@calmeter/shared');
+
+      const err = {
+        code: 'FEATURE_LIMIT_EXCEEDED',
+        message: 'Daily AI photo scan limit reached.',
+        feature: FeatureKey.AI_PHOTO_SCAN,
+        limit: 3,
+        currentUsage: 3,
+        upgradeUrl: '/paywall',
+      };
+
+      expect(FeatureLimitExceededErrorSchema.safeParse(err).success).toBe(true);
+    });
+  });
+
+  describe('Notifications & Reminders Contracts (Part 13)', () => {
+    it('validates RegisterDeviceTokenSchema', async () => {
+      const { RegisterDeviceTokenSchema } = await import('../src/notification.contract.js');
+      const { DevicePlatform } = await import('@calmeter/shared');
+
+      const payload = {
+        token: 'fcm-device-registration-token-valid-length-1234567890',
+        platform: DevicePlatform.ANDROID,
+        deviceModel: 'Pixel 8 Pro',
+        osVersion: 'Android 14',
+        appVersion: '1.0.0',
+      };
+
+      expect(RegisterDeviceTokenSchema.safeParse(payload).success).toBe(true);
+    });
+
+    it('validates NotificationPreferenceSchema defaults and custom reminder times', async () => {
+      const { NotificationPreferenceSchema } = await import('../src/notification.contract.js');
+
+      const payload = {
+        enabled: true,
+        mealReminders: true,
+        breakfastReminder: true,
+        lunchReminder: true,
+        dinnerReminder: true,
+        waterReminders: true,
+        dailySummary: true,
+        weeklySummary: true,
+        weightReminders: true,
+        coachInsights: true,
+        subscriptionUpdates: true,
+        breakfastTime: '08:30',
+        lunchTime: '13:00',
+        dinnerTime: '20:00',
+        dailySummaryTime: '21:30',
+        weightReminderTime: '08:00',
+        weeklySummaryDay: 0,
+        waterIntervalHours: 2,
+        waterStartTime: '09:00',
+        waterEndTime: '21:00',
+        quietHoursStart: '22:00',
+        quietHoursEnd: '07:00',
+        timezone: 'Asia/Kolkata',
+      };
+
+      const result = NotificationPreferenceSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects invalid time formats for notification preferences', async () => {
+      const { NotificationPreferenceSchema } = await import('../src/notification.contract.js');
+
+      const invalid = {
+        breakfastTime: '25:00', // invalid hour
+      };
+
+      expect(NotificationPreferenceSchema.safeParse(invalid).success).toBe(false);
+    });
+  });
+
+  describe('Product Analytics Contracts (Part 13)', () => {
+    it('validates TrackAnalyticsEventSchema and BatchAnalyticsEventsSchema', async () => {
+      const { TrackAnalyticsEventSchema, BatchAnalyticsEventsSchema } =
+        await import('../src/analytics.contract.js');
+      const { AnalyticsEventName } = await import('@calmeter/shared');
+
+      const single = {
+        eventName: AnalyticsEventName.DIARY_ENTRY_CREATED,
+        properties: { mealType: 'LUNCH', calories: 540 },
+        devicePlatform: 'ANDROID',
+        appVersion: '1.0.0',
+        sessionId: 'sess_123',
+      };
+
+      expect(TrackAnalyticsEventSchema.safeParse(single).success).toBe(true);
+
+      const batch = {
+        events: [single],
+      };
+
+      expect(BatchAnalyticsEventsSchema.safeParse(batch).success).toBe(true);
+    });
+  });
+
+  describe('Operational Metrics Contracts (Part 13)', () => {
+    it('validates OperationalMetricsResponseSchema structure', async () => {
+      const { OperationalMetricsResponseSchema } = await import('../src/metrics.contract.js');
+
+      const metric = {
+        service: 'calmeter-api',
+        version: '1.0.0',
+        environment: 'test',
+        timestamp: '2026-11-10T12:00:00.000Z',
+        uptimeSeconds: 3600,
+        memoryUsage: {
+          heapUsedMb: 64.2,
+          heapTotalMb: 128.0,
+          rssMb: 180.5,
+        },
+        httpMetrics: {
+          totalRequests: 1500,
+          statusCodes: { '200': 1480, '404': 15, '500': 5 },
+          averageLatencyMs: 45.2,
+          p95LatencyMs: 120.0,
+        },
+        workerMetrics: {
+          activeJobs: 2,
+          completedJobs: 140,
+          failedJobs: 1,
+          waitingJobs: 0,
+        },
+        aiMetrics: {
+          requestCount: 50,
+          totalTokens: 15400,
+          promptTokens: 12000,
+          completionTokens: 3400,
+          averageLatencyMs: 650.0,
+        },
+      };
+
+      expect(OperationalMetricsResponseSchema.safeParse(metric).success).toBe(true);
+    });
+  });
 });

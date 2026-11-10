@@ -87,3 +87,4 @@ ALTER TABLE "revenuecat_webhook_events" ADD CONSTRAINT "revenuecat_webhook_event
 
 -- AddForeignKey
 ALTER TABLE "user_feature_usage" ADD CONSTRAINT "user_feature_usage_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: calmeter-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-calmeter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-calmeter_prod_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-calmeter_prod}
+    ports:
+      - "5432:5432"
+    volumes:
+      - calmeter_prod_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-calmeter} -d ${POSTGRES_DB:-calmeter_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: calmeter-prod-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_prod_secret}
+    ports:
+      - "6379:6379"
+    volumes:
+      - calmeter_prod_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_prod_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: calmeter-prod-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-calmeter}:${POSTGRES_PASSWORD:-calmeter_prod_secret}@postgres:5432/${POSTGRES_DB:-calmeter_prod}?schema=public&connection_limit=20
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_prod_secret}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: calmeter-prod-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-calmeter}:${POSTGRES_PASSWORD:-calmeter_prod_secret}@postgres:5432/${POSTGRES_DB:-calmeter_prod}?schema=public&connection_limit=10
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_prod_secret}
+
+volumes:
+  calmeter_prod_pgdata:
+    name: calmeter_prod_pgdata
+  calmeter_prod_redisdata:
+    name: calmeter_prod_redisdata

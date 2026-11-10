@@ -455,3 +455,84 @@ sequenceDiagram
         App->>User: Confirms meal logged to daily diary
     end
 ```
+
+---
+
+## 13. Notifications, Deep Linking & User Reminders Flow (Part 13)
+
+### 13.1. Contextual Permission Request & Token Registration
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant App as Mobile App
+    participant OS as Device OS (iOS / Android)
+    participant FCM as Firebase Cloud Messaging
+    participant API as Backend API (/api/v1/notifications)
+    participant DB as PostgreSQL Database
+
+    User->>App: Completes Onboarding / First Meal Log
+    App->>App: Checks push notification permission status
+    alt Permission not yet requested
+        App->>User: Displays Contextual Rationale Modal ("Stay on track with mindful meal check-ins")
+        User->>App: Taps "Enable Reminders"
+        App->>OS: Request System Notification Permission
+        OS->>User: Displays native OS permission prompt
+        User->>OS: Grants permission
+        OS-->>App: Permission GRANTED
+        App->>FCM: Retrieve FCM Device Registration Token
+        FCM-->>App: Returns unique deviceToken
+        App->>API: POST /notifications/device-token { token, platform, model, appVersion }
+        API->>DB: Upsert DeviceToken record (linked to internal userId)
+        DB-->>API: DeviceToken persisted
+        API-->>App: 200 OK (deviceToken confirmed)
+    end
+
+    alt User logs out or switches account
+        User->>App: Taps "Log Out" in Profile
+        App->>API: DELETE /notifications/device-token { token }
+        API->>DB: UPDATE device_tokens SET is_active = false
+        DB-->>API: Deactivated
+        API-->>App: 200 OK
+        App->>App: Clears local session & token
+    end
+```
+
+### 13.2. Timezone-Aware Reminder Dispatch, Quiet Hours & Deep Link Routing
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Cron as Worker Scheduler (BullMQ Cron)
+    participant Worker as Background Worker
+    participant DB as PostgreSQL Database
+    participant FCM as Firebase Cloud Messaging
+    actor User
+    participant OS as Device OS
+    participant App as Mobile App
+
+    Cron->>Worker: Recurring Reminder Check (every 15 min)
+    Worker->>DB: Query users where reminder is due within window
+    DB-->>Worker: List of user candidates with timezone & preferences
+
+    loop For each user candidate
+        Worker->>Worker: Check local time in user's IANA timezone
+        alt Within user's Quiet Hours (e.g. 22:00 to 07:00)
+            Worker->>DB: Record NotificationHistory (Status: SKIPPED_QUIET_HOURS)
+        else Reminders enabled for this category
+            Worker->>DB: Query active device tokens for user
+            DB-->>Worker: [fcmToken1, fcmToken2]
+            Worker->>FCM: sendEachForMulticast(tokens, notification, data: { link: "calmeter://diary?meal=lunch" })
+            FCM-->>Worker: Multicast response (success: 2, invalidTokens: [])
+            Worker->>DB: Record NotificationHistory (Status: SENT, deviceCount: 2)
+            FCM->>OS: Deliver push notification to device
+            OS->>User: Renders notification ("Lunch Reminder: Log your afternoon meal")
+        end
+    end
+
+    User->>OS: Taps push notification
+    OS->>App: Opens deep link `calmeter://diary?meal=lunch`
+    App->>App: parseDeepLink() extracts route 'Diary' and params { meal: 'lunch' }
+    App->>User: Navigates directly to Food Diary focused on Lunch section
+```

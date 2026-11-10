@@ -3,9 +3,11 @@ import type { PrismaClient } from '@prisma/client';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { requestLoggerMiddleware } from './middleware/logger.js';
 import { createSecurityMiddleware } from './middleware/security.js';
+import { createRateLimiter } from './middleware/rateLimiter.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { createRootRouter } from './routes/index.js';
 import type { IFirebaseTokenVerifier } from './lib/firebase.js';
+import type { IPushNotificationProvider } from './services/notificationDispatcher.service.js';
 import { getConfig, type ParsedTrustProxy } from './config/env.js';
 
 import type { Router } from 'express';
@@ -19,6 +21,7 @@ export interface CreateAppOptions {
   configureRoutes?: (app: Express) => void;
   barcodeService?: BarcodeLookupService;
   foodRouter?: Router;
+  pushProvider?: IPushNotificationProvider;
 }
 
 export function createApp(options?: CreateAppOptions): Express {
@@ -43,6 +46,9 @@ export function createApp(options?: CreateAppOptions): Express {
   const securityMiddlewares = createSecurityMiddleware();
   securityMiddlewares.forEach(middleware => app.use(middleware));
 
+  // Global rate limiter with automatic memory fallback
+  app.use(createRateLimiter());
+
   // Application Routes with injected dependencies
   const verifier = options?.verifier ?? options?.customVerifier;
   const router = createRootRouter({
@@ -50,6 +56,7 @@ export function createApp(options?: CreateAppOptions): Express {
     prisma: options?.prisma,
     foodRouter: options?.foodRouter,
     barcodeService: options?.barcodeService,
+    pushProvider: options?.pushProvider,
   });
   app.use('/', router);
 

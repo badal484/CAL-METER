@@ -1509,3 +1509,197 @@ Receives, verifies, and idempotently processes real-time server-to-server subscr
   }
 }
 ```
+
+---
+
+## 13. Notifications, Analytics & Operational Metrics API (Part 13)
+
+### 13.1. `POST /api/v1/notifications/device-token`
+
+Registers or refreshes an active Firebase Cloud Messaging (FCM) device push token.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Request Body (`RegisterDeviceTokenInput`):**
+
+```json
+{
+  "token": "fcm-registration-token-string",
+  "platform": "ANDROID",
+  "deviceModel": "Pixel 8 Pro",
+  "osVersion": "Android 14",
+  "appVersion": "1.0.0"
+}
+```
+
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "c92842e1-4567-4890-a123-b4567890cdef",
+    "platform": "ANDROID",
+    "isActive": true,
+    "updatedAt": "2026-11-10T12:00:00.000Z"
+  }
+}
+```
+
+### 13.2. `DELETE /api/v1/notifications/device-token`
+
+Deactivates an FCM device token upon user logout or account switch to prevent leaking notifications.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Request Body:**
+
+```json
+{
+  "token": "fcm-registration-token-string"
+}
+```
+
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Device token deactivated."
+  }
+}
+```
+
+### 13.3. `GET /api/v1/notifications/preferences`
+
+Retrieves user's notification preferences, custom reminder times, and quiet hours schedule.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "enabled": true,
+    "mealReminders": true,
+    "breakfastReminder": true,
+    "lunchReminder": true,
+    "dinnerReminder": true,
+    "waterReminders": true,
+    "dailySummary": true,
+    "weeklySummary": true,
+    "weightReminders": true,
+    "coachInsights": true,
+    "breakfastTime": "08:30",
+    "lunchTime": "13:00",
+    "dinnerTime": "20:00",
+    "dailySummaryTime": "21:30",
+    "weightReminderTime": "08:00",
+    "waterIntervalHours": 2,
+    "quietHoursStart": "22:00",
+    "quietHoursEnd": "07:00",
+    "timezone": "Asia/Kolkata"
+  }
+}
+```
+
+### 13.4. `PATCH /api/v1/notifications/preferences`
+
+Updates partial notification settings, reminder times (`HH:mm`), or quiet window.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Request Body (`UpdateNotificationPreferenceInput`):**
+
+```json
+{
+  "breakfastTime": "07:30",
+  "waterIntervalHours": 3,
+  "quietHoursStart": "23:00",
+  "quietHoursEnd": "06:30"
+}
+```
+
+- **Response (`200 OK`):** Updated `NotificationPreferenceData` object.
+
+### 13.5. `POST /api/v1/notifications/test`
+
+Dispatches a test notification to the user's active registered devices for mobile verification.
+
+- **Authentication:** Required (`Bearer <token>`)
+- **Request Body:**
+
+```json
+{
+  "category": "MEAL_REMINDER_BREAKFAST",
+  "title": "Breakfast check-in",
+  "body": "Ready to log your morning meal?"
+}
+```
+
+- **Response (`200 OK`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "SENT",
+    "deviceCount": 1
+  }
+}
+```
+
+### 13.6. `POST /api/v1/analytics/track` & `POST /api/v1/analytics/batch`
+
+Ingests individual or batched product analytics events with zero-PII guarantee.
+
+- **Authentication:** Optional (Supports anonymous onboarding and authenticated user journeys)
+- **Request Body (`BatchAnalyticsEventsInput`):**
+
+```json
+{
+  "events": [
+    {
+      "eventName": "DIARY_ENTRY_CREATED",
+      "properties": {
+        "mealType": "LUNCH",
+        "calories": 620
+      },
+      "devicePlatform": "ANDROID",
+      "appVersion": "1.0.0"
+    }
+  ]
+}
+```
+
+- **Response (`200 OK`):**
+
+```json
+{
+  "status": "ok",
+  "accepted": 1,
+  "rejected": 0
+}
+```
+
+### 13.7. `GET /metrics` & `GET /api/v1/metrics`
+
+Surfaces operational application telemetry, latency percentiles, and memory utilization.
+
+- **Authentication:** Public / Internal scrape
+- **Formats:**
+  - `Accept: application/json` -> JSON `OperationalMetricsResponse`
+  - `Accept: text/plain` or `?format=prometheus` -> Prometheus exposition format
+- **Sample Prometheus Response:**
+
+```text
+# HELP process_uptime_seconds Process uptime in seconds
+# TYPE process_uptime_seconds gauge
+process_uptime_seconds{service="calmeter_api"} 3600
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{service="calmeter_api"} 1420
+# HELP http_request_duration_ms Average HTTP request latency in ms
+# TYPE http_request_duration_ms gauge
+http_request_duration_ms{service="calmeter_api",quantile="avg"} 28.5
+http_request_duration_ms{service="calmeter_api",quantile="p95"} 85.0
+```

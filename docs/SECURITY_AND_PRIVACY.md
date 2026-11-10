@@ -361,3 +361,46 @@ CAL METER adheres to strict privacy-by-design principles regarding mobile camera
   - Fake countdown timers, artificial scarcity claims, pre-checked deceptive options, or hidden renewal charges are strictly prohibited in the CAL METER client codebase.
 - **Apple Guideline 5.1.1(v) (Account Deletion & Subscription Unlinking):**
   - When an account deletion is requested, the internal subscription row is deleted via cascading foreign key, while audit webhook logs have `user_id` safely nullified (`onDelete: SetNull`) to maintain regulatory accounting records.
+
+---
+
+## 11. Push Notifications, Product Analytics & Production Hardening (Part 13)
+
+### 11.1. Device Token Security & Cross-Account Isolation
+
+- **Token Ownership Re-assignment on Account Switch:**
+  - If multiple family members or shared users switch accounts on a single physical mobile device, the FCM token is reassigned to the currently active authenticated user ID.
+  - Active device tokens are immediately deactivated (`is_active = false`) upon user logout.
+  - Device tokens associated with unregistered/invalid FCM errors are automatically marked inactive, preventing wasted network calls and privacy leaks.
+- **Payload Data Minimization:**
+  - Push notification payloads do not contain sensitive private biometric information, medical notes, or raw meal details.
+  - Only route hints and identifier arguments (`calmeter://diary?meal=lunch`) are embedded into notification data bundles.
+
+### 11.2. Product Analytics & Zero-PII Guarantee
+
+- **Mandatory Property Scrubbing Pipeline:**
+  - Every tracked event passes through `sanitizeAnalyticsProperties` before network transport and backend persistence.
+  - Sensitive keys matching patterns such as `/password/i`, `/token/i`, `/secret/i`, `/auth/i`, `/email/i`, `/phone/i`, `/ssn/i`, `/notes/i`, `/rawtext/i`, `/coachprompt/i`, and `/coachresponse/i` are automatically redacted with `[REDACTED]`.
+  - Values resembling email addresses or JWT bearer strings embedded in non-sensitive keys are detected via regex and sanitized to `[REDACTED_EMAIL]` and `[REDACTED_TOKEN]`.
+  - String lengths are capped at 500 characters and depth is capped at 4 levels, preventing buffer bloat.
+- **Anonymized Telemetry:**
+  - Product funnel telemetry tracks user behaviors and conversion steps without retaining private nutritional conversations or dietary health details.
+
+### 11.3. Rate Limiting & Denial of Service Defenses
+
+- **Tiered Sliding-Window Throttling:**
+  - Protects all public and authenticated endpoints with configurable request thresholds per IP / authenticated user.
+  - Standard API rate limit: 100 requests per 60 seconds.
+  - Auth rate limit: 20 requests per 60 seconds.
+  - AI photo scan limit: 10 requests per 60 seconds.
+  - Emits standard RFC 6585 headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `Retry-After`.
+- **Fail-Open Resilience on Infrastructure Outages:**
+  - In the event of a Redis connectivity drop or infrastructure disruption, the rate limiter automatically falls back to an in-memory sliding window bucket store. The API never fails closed or takes down legitimate user requests due to temporary cache unavailability.
+
+### 11.4. Operational Observability & Health Probes
+
+- **Standard Kubernetes / Docker Probes:**
+  - `GET /health`: Liveness probe indicating HTTP server responsiveness.
+  - `GET /ready`: Readiness probe verifying active PostgreSQL database connectivity and Redis ping.
+- **Telemetry Endpoints:**
+  - `GET /metrics` and `GET /api/v1/metrics`: Surfaces in-memory operational performance metrics, heap utilization, request latency percentiles (average and P95), and status code distributions in Prometheus exposition format.

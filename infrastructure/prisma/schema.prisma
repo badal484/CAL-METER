@@ -196,6 +196,56 @@ enum InsightCategory {
   CAUTION
 }
 
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum NotificationCategory {
+  MEAL_REMINDER_BREAKFAST
+  MEAL_REMINDER_LUNCH
+  MEAL_REMINDER_DINNER
+  WATER_REMINDER
+  DAILY_SUMMARY
+  WEEKLY_SUMMARY
+  WEIGHT_REMINDER
+  COACH_INSIGHT
+  SUBSCRIPTION_LIFECYCLE
+  ACCOUNT_SECURITY
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED_QUIET_HOURS
+  SKIPPED_PREFERENCE
+}
+
+enum AnalyticsEventName {
+  USER_REGISTERED
+  ONBOARDING_STARTED
+  ONBOARDING_COMPLETED
+  FOOD_SEARCH_PERFORMED
+  DIARY_ENTRY_CREATED
+  DIARY_ENTRY_UPDATED
+  DIARY_ENTRY_DELETED
+  PHOTO_SCAN_INITIATED
+  PHOTO_SCAN_COMPLETED
+  BARCODE_SCAN_COMPLETED
+  COACH_MESSAGE_SENT
+  INSIGHT_VIEWED
+  MEAL_RECOMMENDATION_ACCEPTED
+  PAYWALL_VIEWED
+  PURCHASE_INITIATED
+  PURCHASE_COMPLETED
+  PURCHASE_RESTORED
+  WEIGHT_LOGGED
+  WATER_LOGGED
+  EXERCISE_LOGGED
+}
+
 // -------------------------------------------------------------
 // MODELS
 // -------------------------------------------------------------
@@ -222,6 +272,10 @@ model User {
   subscription Subscription?
   webhookEvents RevenueCatWebhookEvent[]
   featureUsages UserFeatureUsage[]
+  deviceTokens  DeviceToken[]
+  notificationPref NotificationPreference?
+  notificationHistory NotificationHistory[]
+  analyticsEvents AnalyticsEvent[]
   customFoods  FoodItem[]        @relation("UserCustomFoods")
   deletionReq  DeletionRequest?
 
@@ -747,6 +801,101 @@ model CoachInsight {
   @@index([userId, generatedAt(sort: Desc)])
   @@index([userId, type])
   @@map("coach_insights")
+}
+
+model DeviceToken {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  token       String         @unique @db.VarChar(512)
+  platform    DevicePlatform @default(ANDROID)
+  deviceModel String?        @map("device_model") @db.VarChar(100)
+  osVersion   String?        @map("os_version") @db.VarChar(50)
+  appVersion  String?        @map("app_version") @db.VarChar(50)
+  isActive    Boolean        @default(true) @map("is_active")
+  lastSeenAt  DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([token])
+  @@index([lastSeenAt])
+  @@map("device_tokens")
+}
+
+model NotificationPreference {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @unique @map("user_id") @db.Uuid
+  enabled             Boolean  @default(true)
+  mealReminders       Boolean  @default(true) @map("meal_reminders")
+  breakfastReminder   Boolean  @default(true) @map("breakfast_reminder")
+  lunchReminder       Boolean  @default(true) @map("lunch_reminder")
+  dinnerReminder      Boolean  @default(true) @map("dinner_reminder")
+  waterReminders      Boolean  @default(true) @map("water_reminders")
+  dailySummary        Boolean  @default(true) @map("daily_summary")
+  weeklySummary       Boolean  @default(true) @map("weekly_summary")
+  weightReminders     Boolean  @default(true) @map("weight_reminders")
+  coachInsights       Boolean  @default(true) @map("coach_insights")
+  subscriptionUpdates Boolean  @default(true) @map("subscription_updates")
+
+  breakfastTime       String   @default("08:30") @map("breakfast_time") @db.VarChar(5)
+  lunchTime           String   @default("13:00") @map("lunch_time") @db.VarChar(5)
+  dinnerTime          String   @default("20:00") @map("dinner_time") @db.VarChar(5)
+  dailySummaryTime    String   @default("21:30") @map("daily_summary_time") @db.VarChar(5)
+  weightReminderTime  String   @default("08:00") @map("weight_reminder_time") @db.VarChar(5)
+  weeklySummaryDay    Int      @default(0) @map("weekly_summary_day")
+  waterIntervalHours  Int      @default(2) @map("water_interval_hours")
+  waterStartTime      String   @default("09:00") @map("water_start_time") @db.VarChar(5)
+  waterEndTime        String   @default("21:00") @map("water_end_time") @db.VarChar(5)
+
+  quietHoursStart     String?  @default("22:00") @map("quiet_hours_start") @db.VarChar(5)
+  quietHoursEnd       String?  @default("07:00") @map("quiet_hours_end") @db.VarChar(5)
+
+  timezone            String   @default("Asia/Kolkata") @db.VarChar(64)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model NotificationHistory {
+  id            String                     @id @default(uuid()) @db.Uuid
+  userId        String                     @map("user_id") @db.Uuid
+  category      NotificationCategory
+  title         String                     @db.VarChar(200)
+  body          String                     @db.Text
+  data          Json?                      @db.JsonB
+  status        NotificationDeliveryStatus @default(PENDING)
+  deviceCount   Int                        @default(0) @map("device_count")
+  failureReason String?                    @map("failure_reason") @db.Text
+  sentAt        DateTime?                  @map("sent_at") @db.Timestamptz(6)
+  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([category, status])
+  @@map("notification_history")
+}
+
+model AnalyticsEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String?   @map("user_id") @db.Uuid
+  eventName      String    @map("event_name") @db.VarChar(100)
+  properties     Json      @db.JsonB
+  devicePlatform String?   @map("device_platform") @db.VarChar(20)
+  appVersion     String?   @map("app_version") @db.VarChar(50)
+  sessionId      String?   @map("session_id") @db.VarChar(100)
+  timestamp      DateTime  @default(now()) @db.Timestamptz(6)
+
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, timestamp(sort: Desc)])
+  @@index([eventName, timestamp(sort: Desc)])
+  @@map("analytics_events")
 }
 
 
