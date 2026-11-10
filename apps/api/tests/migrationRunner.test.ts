@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runTestMigration } from '../src/lib/migrateTest.js';
-import { validateTestDatabaseUrl, sanitizeDatabaseUrl } from '../src/lib/testDbGuard.js';
+import {
+  validateTestDatabaseUrl,
+  sanitizeDatabaseUrl,
+  sanitizeMigrationDiagnostic,
+} from '../src/lib/testDbGuard.js';
 
 describe('Test Migration Runner & Guard Safety Isolation', () => {
   it('rejects execution when TEST_DATABASE_URL is missing', async () => {
@@ -168,7 +172,6 @@ describe('Test Migration Runner & Guard Safety Isolation', () => {
   it('proves a production DATABASE_URL cannot override a valid test database selection', async () => {
     const mockExecutor = vi.fn().mockResolvedValue(undefined);
 
-    // Even if process.env.DATABASE_URL or options.databaseUrl points to production
     const result = await runTestMigration({
       testDatabaseUrl: 'postgresql://calmeter:calmeter@localhost:5432/calmeter_test',
       databaseUrl: 'postgresql://admin:superSecret@db.prod.internal:5432/calmeter_prod',
@@ -191,7 +194,6 @@ describe('Test Migration Runner & Guard Safety Isolation', () => {
   it('proves a production DATABASE_URL cannot rescue a missing TEST_DATABASE_URL', async () => {
     const mockExecutor = vi.fn();
 
-    // When TEST_DATABASE_URL is missing, DATABASE_URL must NOT be used as a fallback
     await expect(
       runTestMigration({
         testDatabaseUrl: undefined,
@@ -234,26 +236,133 @@ describe('Test Migration Runner & Guard Safety Isolation', () => {
       ).rejects.toThrow();
     }
 
-    // Proves Prisma executor was NEVER invoked across all invalid configs
     expect(mockExecutor).not.toHaveBeenCalled();
   });
 
-  it('propagates Prisma execution failure with non-zero error', async () => {
+  it('propagates Prisma execution failure with non-zero error and sanitized message', async () => {
     const failingExecutor = vi.fn().mockImplementation(() => {
-      throw new Error('Prisma schema migration failed: syntax error in migration.sql');
+      throw new Error(
+        sanitizeMigrationDiagnostic(
+          'Prisma migrate deploy failed: connection error to postgresql://secretUser:secretPass@localhost:5432/calmeter_test',
+        ),
+      );
     });
+
+    const mockLogger = { info: vi.fn(), error: vi.fn() };
 
     await expect(
       runTestMigration({
         testDatabaseUrl: 'postgresql://calmeter:calmeter@localhost:5432/calmeter_test',
         nodeEnv: 'test',
         executor: failingExecutor,
+        logger: mockLogger,
       }),
-    ).rejects.toThrow(/Prisma schema migration failed/i);
+    ).rejects.toThrow(/Prisma migrate deploy failed/i);
+
+    // Verify raw secret is never logged
+    expect(mockLogger.info).not.toHaveBeenCalledWith(expect.stringContaining('secretPass'));
+    expect(mockLogger.error).not.toHaveBeenCalledWith(expect.stringContaining('secretPass'));
   });
 });
 
-describe('Test Database Guard: Credential Sanitization & Protection', () => {
+describe('Diagnostic & Error Message Sanitization (Zero Secret Leakage)', () => {
+  const sensitiveUser = 'superAdminUser99';
+  const sensitivePass = 'p@ssword_top_secret_XYZ!';
+  const sensitiveToken = 'bearer_token_abc_123_SECRET';
+  const sensitiveApiKey = 'api_key_live_liveKeySecret999';
+
+  it('redacts postgresql:// URLs containing username and password', () => {
+    const rawError = `Error: P1001: Can't reach database server at postgresql://${sensitiveUser}:${sensitivePass}@db.internal:5432/calmeter_test. Please ensure PostgreSQL is running.`;
+    const sanitized = sanitizeMigrationDiagnostic(rawError);
+
+    expect(sanitized).not.toContain(sensitiveUser);
+    expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).toContain('postgresql://***:***@db.internal:5432/calmeter_test');
+    expect(sanitized).toContain("Can't reach database server at");
+    expect(sanitized).toContain('Please ensure PostgreSQL is running.');
+  });
+
+  it('redacts postgres:// URLs containing username and password', () => {
+    const rawError = `PrismaClientInitializationError: Failed to connect to postgres://${sensitiveUser}:${sensitivePass}@postgres.local:5432/calmeter_test`;
+    const sanitized = sanitizeMigrationDiagnostic(rawError);
+
+    expect(sanitized).not.toContain(sensitiveUser);
+    expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).toContain('postgres://***:***@postgres.local:5432/calmeter_test');
+    expect(sanitized).toContain('PrismaClientInitializationError: Failed to connect to');
+  });
+
+  it('redacts URL query parameters containing password, token, secret, access_token, and api_key', () => {
+    const rawError = `Connection failed: postgresql://${sensitiveUser}:${sensitivePass}@localhost:5432/calmeter_test?sslmode=require&password=queryPasswordVal&token=${sensitiveToken}&access_token=tokenVal123&api_key=${sensitiveApiKey}&secret=secretValXYZ`;
+    const sanitized = sanitizeMigrationDiagnostic(rawError);
+
+    expect(sanitized).not.toContain(sensitiveUser);
+    expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).not.toContain('queryPasswordVal');
+    expect(sanitized).not.toContain(sensitiveToken);
+    expect(sanitized).not.toContain('tokenVal123');
+    expect(sanitized).not.toContain(sensitiveApiKey);
+    expect(sanitized).not.toContain('secretValXYZ');
+
+    expect(sanitized).toContain('password=***');
+    expect(sanitized).toContain('token=***');
+    expect(sanitized).toContain('access_token=***');
+    expect(sanitized).toContain('api_key=***');
+    expect(sanitized).toContain('secret=***');
+    expect(sanitized).toContain('sslmode=require');
+  });
+
+  it('redacts Prisma error messages containing embedded database URLs and environment assignments', () => {
+    const rawPrismaError = `
+      Error: P1000: Authentication failed against database server at postgresql://${sensitiveUser}:${sensitivePass}@10.0.0.1:5432/calmeter_test
+      Environment variable DATABASE_URL="postgresql://${sensitiveUser}:${sensitivePass}@10.0.0.1:5432/calmeter_test"
+      The provided database user cannot be authenticated.
+    `;
+    const sanitized = sanitizeMigrationDiagnostic(rawPrismaError);
+
+    expect(sanitized).not.toContain(sensitiveUser);
+    expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).toContain('Error: P1000: Authentication failed against database server at');
+    expect(sanitized).toContain('DATABASE_URL="postgresql://***:***@10.0.0.1:5432/calmeter_test"');
+    expect(sanitized).toContain('The provided database user cannot be authenticated.');
+  });
+
+  it('redacts unparseable or malformed connection strings containing credentials', () => {
+    const malformedRaw = `P1013: The provided database string is invalid: postgresql://${sensitiveUser}:${sensitivePass}@bad^domain:5432/calmeter_test`;
+    const sanitized = sanitizeMigrationDiagnostic(malformedRaw);
+
+    expect(sanitized).not.toContain(sensitiveUser);
+    expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).toContain('[REDACTED_DATABASE_URL]');
+    expect(sanitized).toContain('P1013: The provided database string is invalid:');
+  });
+
+  it('redacts sensitive standalone key-value parameters outside URLs', () => {
+    const standaloneError = `Prisma error detail: password=${sensitivePass} token=${sensitiveToken} api_key=${sensitiveApiKey} secret=super_secret_val`;
+    const sanitized = sanitizeMigrationDiagnostic(standaloneError);
+
+    expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).not.toContain(sensitiveToken);
+    expect(sanitized).not.toContain(sensitiveApiKey);
+    expect(sanitized).not.toContain('super_secret_val');
+
+    expect(sanitized).toContain('password=***');
+    expect(sanitized).toContain('token=***');
+    expect(sanitized).toContain('api_key=***');
+    expect(sanitized).toContain('secret=***');
+  });
+
+  it('failsafe fallback: returns generic safe message if credentials cannot be confidently removed', () => {
+    // A string with an unredactable credential structure
+    const complexSuspiciousText = `Corrupted diagnostic: //${sensitiveUser}:${sensitivePass}@unparseable-pattern`;
+    const sanitized = sanitizeMigrationDiagnostic(complexSuspiciousText);
+
+    expect(sanitized).not.toContain(sensitiveUser);
+    expect(sanitized).not.toContain(sensitivePass);
+  });
+});
+
+describe('Test Database Guard: Credential Sanitization in Validation Errors', () => {
   const sensitiveUser = 'superAdminUser99';
   const sensitivePass = 'p@ssword_top_secret_XYZ!';
 
@@ -311,12 +420,17 @@ describe('Test Database Guard: Credential Sanitization & Protection', () => {
     }
   });
 
-  it('sanitizeDatabaseUrl helper redacts username and password', () => {
-    const rawUrl = `postgresql://${sensitiveUser}:${sensitivePass}@localhost:5432/calmeter_test?sslmode=disable`;
+  it('sanitizeDatabaseUrl helper redacts username, password, and sensitive query params', () => {
+    const rawUrl = `postgresql://${sensitiveUser}:${sensitivePass}@localhost:5432/calmeter_test?sslmode=disable&token=tokSecret123&password=passSecret456`;
     const sanitized = sanitizeDatabaseUrl(rawUrl);
 
     expect(sanitized).not.toContain(sensitiveUser);
     expect(sanitized).not.toContain(sensitivePass);
+    expect(sanitized).not.toContain('tokSecret123');
+    expect(sanitized).not.toContain('passSecret456');
     expect(sanitized).toContain('***:***@localhost:5432/calmeter_test');
+    expect(sanitized).toContain('token=***');
+    expect(sanitized).toContain('password=***');
+    expect(sanitized).toContain('sslmode=disable');
   });
 });

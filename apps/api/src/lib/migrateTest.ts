@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateTestDatabaseUrl } from './testDbGuard.js';
+import { validateTestDatabaseUrl, sanitizeMigrationDiagnostic } from './testDbGuard.js';
 
 export interface TestMigrationOptions {
   testDatabaseUrl?: string;
@@ -57,14 +57,13 @@ export function defaultPrismaExecutor(validatedUrl: string, schemaPath: string):
       encoding: 'utf-8',
     });
   } catch (err: unknown) {
-    const error = err as { status?: number; stderr?: string; message?: string };
+    const error = err as { status?: number; stderr?: string; stdout?: string; message?: string };
     const exitCode = error.status ?? 1;
-    // Sanitize any database connection strings or credentials in stderr
-    const sanitizedStderr = error.stderr
-      ? error.stderr.replace(/postgresql:\/\/[^\s]+/g, '[REDACTED_DATABASE_URL]')
-      : error.message || 'Prisma migration deploy execution failed';
+    // Centralized diagnostic sanitization: never expose raw error objects or connection secrets
+    const rawDiagnostic = error.stderr || error.stdout || error.message || '';
+    const sanitizedDiagnostic = sanitizeMigrationDiagnostic(rawDiagnostic);
     throw new Error(
-      `[Test Migration Runner] Migration execution failed (exit code ${exitCode}): ${sanitizedStderr.trim()}`,
+      `[Test Migration Runner] Migration execution failed (exit code ${exitCode}): ${sanitizedDiagnostic}`,
     );
   }
 }
