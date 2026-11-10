@@ -140,14 +140,30 @@ flowchart TD
     - "Add Missing Item" and "Remove Item" triggers.
 - **FR-4.6:** Confirmation: Single tap "Log to [Meal Slot]" commits records to user's daily diary.
 
-### 5.4. Barcode Scanner (Feature 6)
+### 5.4. Barcode Scanner & Packaged Food Recognition (Feature 6)
 
-- **FR-6.1:** Real-time on-device barcode detection (UPC-A, UPC-E, EAN-8, EAN-13, Code 128) using hardware-accelerated ML scanner.
-- **FR-6.2: Open Food Facts Integration & ODbL Compliance:**
-  - Barcode lookup against Open Food Facts API and local PostgreSQL cache.
-  - **Licensing Compliance:** Open Food Facts is published under the Open Database License (ODbL). Any redistribution or derived database modifications must adhere to ODbL attribution and share-alike terms.
-- **FR-6.3:** Display of serving size, brand name, front-of-pack thumbnail, and complete nutritional facts.
-- **FR-6.4:** Fallback when barcode not found: prompt user to enter details manually or photograph nutrition label.
+- **FR-6.1: Supported Barcode Symbologies:**
+  - Real-time on-device barcode detection supporting **EAN-13**, **EAN-8**, **UPC-A**, **UPC-E**, and **Code 128**.
+  - Strict algorithmic validation using GS1 Modulo-10 check digit verification before dispatching network requests.
+  - Zero-suppressed UPC-E barcodes are automatically expanded to standard 12-digit UPC-A formats using GS1 standard rules.
+  - Barcode inputs are normalized by stripping whitespace, hyphens, and leading zero noise where applicable.
+- **FR-6.2: Open Food Facts Integration & Multi-Tier Resolution:**
+  - Fast-path lookup against local PostgreSQL catalog (`food_barcodes` and `food_items`).
+  - Fallback integration to Open Food Facts API with resilient error handling:
+    - 5-second abort timeouts (triggering `504 Gateway Timeout`).
+    - 429 rate limit handling.
+    - 503 upstream service outage handling.
+  - Products resolved from external providers are atomically persisted into the local PostgreSQL database, ensuring all subsequent lookups execute in sub-millisecond local DB time.
+  - **Licensing Compliance:** Open Food Facts is published under the Open Database License (ODbL) 1.0. All responses and mobile UI sheets explicitly display mandatory attribution: _"Data sourced from Open Food Facts under Open Database License (ODbL) 1.0."_
+- **FR-6.3: Strict Data Quality & Null Preservation:**
+  - Never fill missing or unmeasured nutrients with zero (`0`). Unmeasured fields must be strictly preserved as `null` and displayed in the UI as `--` to prevent misleading diabetic or hypertensive users.
+  - Data quality indicators classify records as `VERIFIED`, `EXTERNAL_SOURCE` (Open Food Facts), or `USER_ENTERED`.
+- **FR-6.4: Mobile Scanner Experience & Camera Privacy:**
+  - Camera permissions are **never requested on app mount**; permissions are deferred until the user explicitly taps "Barcode Scanner".
+  - If permissions are denied, an informative fallback screen renders with a prominent "Enter Barcode Manually" option.
+  - Camera scanner features a monochrome targeting reticle, flashlight/torch toggle, and duplicate scan debouncing (minimum 2-second lock window).
+  - Manual entry modal provides live numeric format validation and check digit verification.
+  - Packaged Product Detail Sheet presents front-of-pack images, brand, manufacturer, ingredients, allergen tags, serving size selectors (per serving vs per 100g vs custom), quantity steppers, live nutrition recalculations, and one-tap diary logging with `LoggedMethod.BARCODE`.
 
 ### 5.5. Food Search & Manual Food Logging (Features 8 & 9)
 

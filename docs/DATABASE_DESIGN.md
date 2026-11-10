@@ -24,6 +24,7 @@ erDiagram
 
     MealEntry ||--o{ MealFoodItem : "contains"
     FoodItem ||--o{ MealFoodItem : "referenced by"
+    FoodItem ||--o{ FoodBarcode : "identifiable by"
     FoodItem ||--o{ ServingUnitConversion : "supports"
     FoodItem ||--o| FoodNutrientProfile : "detailed profile"
     FoodItem ||--o{ FoodAlias : "known as"
@@ -128,6 +129,21 @@ erDiagram
         uuid dataSourceId FK
         uuid importBatchId FK
         uuid createdByUserId FK
+        string imageUrl
+        string manufacturer
+        string ingredientsText
+        string[] allergens
+        string[] countries
+        decimal netWeightGrams
+    }
+
+    FoodBarcode {
+        uuid id PK
+        uuid foodItemId FK
+        string barcode UK
+        enum format
+        string country
+        datetime createdAt
     }
 
     FoodNutrientProfile {
@@ -494,6 +510,12 @@ model FoodItem {
   dataSourceId        String?                 @map("data_source_id") @db.Uuid
   importBatchId       String?                 @map("import_batch_id") @db.Uuid
   createdByUserId     String?                 @map("created_by_user_id") @db.Uuid
+  imageUrl            String?                 @map("image_url") @db.VarChar(1000)
+  manufacturer        String?                 @db.VarChar(255)
+  ingredientsText     String?                 @map("ingredients_text") @db.Text
+  allergens           String[]                @default([]) @map("allergens")
+  countries           String[]                @default([]) @map("countries")
+  netWeightGrams      Decimal?                @map("net_weight_grams") @db.Decimal(8, 2)
   createdAt           DateTime                @default(now()) @map("created_at")
   updatedAt           DateTime                @updatedAt @map("updated_at")
 
@@ -505,6 +527,7 @@ model FoodItem {
   nutrientProfile     FoodNutrientProfile?
   servingConversions  ServingUnitConversion[]
   aliases             FoodAlias[]
+  barcodes            FoodBarcode[]
   mealFoodItems       MealFoodItem[]
   recipeIngredients   FoodIngredient[]        @relation("ParentRecipe")
   usedAsIngredientIn  FoodIngredient[]        @relation("IngredientItem")
@@ -518,6 +541,21 @@ model FoodItem {
   @@index([externalId])
   @@index([isCustom, isArchived])
   @@map("food_items")
+}
+
+model FoodBarcode {
+  id         String        @id @default(uuid()) @db.Uuid
+  foodItemId String        @map("food_item_id") @db.Uuid
+  barcode    String        @unique @db.VarChar(64)
+  format     BarcodeFormat @default(EAN_13)
+  country    String?       @db.VarChar(10)
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  foodItem   FoodItem      @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+
+  @@index([foodItemId])
+  @@index([barcode, format])
+  @@map("food_barcodes")
 }
 
 model FoodNutrientProfile {

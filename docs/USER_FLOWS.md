@@ -119,21 +119,58 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    OpenBarcode[User switches to Barcode Mode] --> FrameGuide[Display Barcode Viewfinder Reticle]
-    FrameGuide --> DetectCode[On-Device MLKit scans EAN-13 / UPC-A]
-    DetectCode --> BeepHaptic[Audio Chime + Strong Haptic Pulse]
-    DetectCode --> QueryAPI[GET /foods/barcode/:barcode]
+    UserLaunch[User taps 'Barcode Scanner' on Scan Tab] --> PermCheck{Camera Permission Granted?}
+    PermCheck -- No --> PermRequest[Request Camera Permission]
+    PermRequest -- Denied --> DeniedState[Show Permission Denied Screen]
+    DeniedState --> ManualFallback[Offer 'Enter Barcode Manually']
+    ManualFallback --> ManualModal[Open Manual Numeric Barcode Dialog]
 
-    QueryAPI --> CacheCheck{Found in Redis / DB / Open Food Facts?}
-    CacheCheck -- Yes --> ProductSheet[Slide up Verified Product Card]
-    ProductSheet --> SelectServing[User selects 1 pack / 50g / 2 servings]
-    SelectServing --> TapLog[User taps 'Log Item']
-    TapLog --> Saved[Item committed to selected meal slot]
+    PermCheck -- Yes --> ActiveScanner[Mount Camera Scanner View]
+    PermRequest -- Granted --> ActiveScanner
 
-    CacheCheck -- No --> NotFoundSheet[Show 'Product Not Found' Sheet]
-    NotFoundSheet --> OptionA[Option 1: Scan Nutrition Label OCR]
-    NotFoundSheet --> OptionB[Option 2: Enter Nutrition Manually]
+    ActiveScanner --> Viewfinder[Render Monochrome Reticle & Frame Instructions]
+    ActiveScanner --> TorchToggle[User can toggle Flashlight / Torch]
+    ActiveScanner --> ManualCTA[User can tap 'Enter Barcode Manually']
+    ManualCTA --> ManualModal
+
+    ActiveScanner --> BarcodeDetected[Camera reads EAN-13 / UPC-A / UPC-E / Code 128]
+    ManualModal --> ManualSubmit[User inputs digits & taps Search]
+
+    BarcodeDetected --> DebounceCheck{Debounced? > 2s since last read}
+    DebounceCheck -- No --> IgnoreScan[Ignore duplicate frame trigger]
+    DebounceCheck -- Yes --> LockScan[Lock scanner & show Loading Spinner]
+    ManualSubmit --> LockScan
+
+    LockScan --> APIQuery[GET /foods/barcode/:barcode or POST /foods/barcode/lookup]
+    APIQuery --> ProductFound{Product Resolved?}
+
+    ProductFound -- No --> ErrorBanner[Display Error Alert with 'Try Again' or 'Enter Manually']
+    ErrorBanner --> ActiveScanner
+
+    ProductFound -- Yes --> ProductSheet[Present Packaged Product Bottom Sheet]
+
+    ProductSheet --> ReviewProduct[Display Image, Name, Brand, Quality Badge, Allergens, Ingredients]
+    ProductSheet --> SelectPortion[Select Serving Unit: Per Serving / Per 100g / Custom Weight]
+    ProductSheet --> AdjustQuantity[Adjust Quantity Stepper: - and +]
+    AdjustQuantity --> LiveRecalc[Dynamically recalculate calories, macros, and sodium]
+    LiveRecalc --> PreservesNull[Unmeasured nutrients display as '--', never falsely 0]
+
+    ProductSheet --> SelectMealSlot[Select Meal Slot: Breakfast, Lunch, Dinner, or Snack]
+    ProductSheet --> Attribution[Display Open Food Facts ODbL Attribution Notice]
+    ProductSheet --> ConfirmLog[User taps 'Log to [Meal Slot]']
+
+    ConfirmLog --> DiaryAPI[POST /diary/entries with loggedMethod: BARCODE]
+    DiaryAPI --> SuccessToast[Display 'Added to Diary!' Confirmation]
+    SuccessToast --> CloseSheet[Dismiss sheet & ready for next scan]
 ```
+
+### Detailed Interaction States in Barcode Mode:
+
+1. **Camera Permission Deferral:** Camera permissions are strictly requested at the instant the user taps "Barcode Scanner". If denied, users retain full ability to look up products via manual numeric barcode entry without ever granting camera access.
+2. **Viewfinder & Reticle:** The camera preview renders full-screen with top and bottom darkened masks, framing a high-contrast monochrome targeting reticle with corner guides and instruction text _"Align barcode inside frame"_.
+3. **Real-time Manual Modal Validation:** As users type barcode numbers into the manual dialog, client-side algorithms instantly detect symbology (`EAN-13`, `UPC-A`, `UPC-E`, `Code 128`) and compute the GS1 Modulo-10 checksum, displaying green checkmarks for valid barcodes and explicit error warnings for mistyped check digits.
+4. **Live Portion & Nutrition Preview:** Users can switch between manufacturer-declared standard servings (e.g., _"1 Serving (50 packet)"_) and _"Per 100g"_, adjust unit multipliers with stepper buttons, and observe instantaneous, deterministic nutrient updates.
+5. **ODbL Legal Attribution:** In full compliance with Open Food Facts Open Database License 1.0, the product sheet renders clear attribution to Open Food Facts and its contributors.
 
 ---
 

@@ -193,6 +193,24 @@ export const KeyboardAvoidingView = React.forwardRef<
 );
 KeyboardAvoidingView.displayName = 'KeyboardAvoidingView';
 
+export const Image = React.forwardRef<unknown, Record<string, unknown>>((props, ref) =>
+  React.createElement('Image', { ...props, ref }),
+);
+Image.displayName = 'Image';
+
+export const PermissionsAndroid = {
+  PERMISSIONS: {
+    CAMERA: 'android.permission.CAMERA',
+  },
+  RESULTS: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    NEVER_ASK_AGAIN: 'never_ask_again',
+  },
+  check: async (_permission: string) => true,
+  request: async (_permission: string, _rationale?: unknown) => 'granted',
+};
+
 export const Modal = React.forwardRef<
   unknown,
   React.PropsWithChildren<{ visible?: boolean; [key: string]: unknown }>
@@ -214,6 +232,8 @@ export default {
   Alert,
   View,
   Text,
+  Image,
+  PermissionsAndroid,
   Pressable,
   TextInput,
   Switch,

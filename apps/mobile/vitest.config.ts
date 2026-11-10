@@ -20,6 +20,10 @@ export default defineConfig({
         find: 'react-native-svg',
         replacement: path.resolve(__dirname, './tests/mocks/react-native-svg.ts'),
       },
+      {
+        find: 'react-native-camera-kit',
+        replacement: path.resolve(__dirname, './tests/mocks/react-native-camera-kit.ts'),
+      },
     ],
   },
   test: {
@@ -27,7 +31,12 @@ export default defineConfig({
     environment: 'node',
     server: {
       deps: {
-        inline: [/react-native/, /react-native-safe-area-context/, /react-native-svg/],
+        inline: [
+          /react-native/,
+          /react-native-safe-area-context/,
+          /react-native-svg/,
+          /react-native-camera-kit/,
+        ],
       },
     },
   },

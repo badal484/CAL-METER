@@ -215,3 +215,35 @@ export const ENV = envSchema.parse(process.env);
 
 - **Git Enforcement:** Pre-commit hooks (`git-secrets` / `detect-secrets`) prevent accidental commits of `.env` files or API tokens.
 - **Client Bundling:** No backend API keys or database connection strings are ever included in the React Native JavaScript bundle.
+
+---
+
+## 7. Camera Permissions Minimization & Barcode Scanning Privacy
+
+CAL METER adheres to strict privacy-by-design principles regarding mobile camera hardware and barcode processing:
+
+### 7.1. JIT (Just-In-Time) Camera Permission Request
+
+- In compliance with Apple App Store Guideline 5.1.1 and Google Play privacy policies, the application **never requests camera permissions on initial launch, onboarding, or tab switching**.
+- Permissions are requested solely when the user explicitly interacts with a camera feature (e.g. tapping "Barcode Scanner").
+- If permission is denied or revoked in system settings, the app transitions to a graceful fallback state with a prominent manual barcode entry pathway that requires zero hardware permissions.
+
+### 7.2. Zero Image Upload During Barcode Scanning
+
+- Barcode decoding is performed **entirely on-device** using native hardware vision accelerators.
+- No video frames, image snapshots, camera buffers, or visual metadata are recorded, cached, or transmitted to CAL METER servers during barcode scanning.
+- Only the sanitized numeric barcode string (e.g. `8901030825484`) is transmitted over TLS 1.3 to the backend API for catalog lookup.
+
+### 7.3. Multi-Tenant Custom Food Barcode Isolation
+
+- When users create custom food items with associated barcodes, the barcode resolution service strictly scopes ownership:
+  - Global verified foods and Open Food Facts products are accessible to all users.
+  - Custom food items bound to barcodes are only retrievable if `createdByUserId === req.user.id`.
+  - Unauthenticated or cross-tenant requests for another user's custom barcode return `404 ProductNotFoundError` (anti-enumeration protection).
+
+### 7.4. Third-Party Licensing Compliance (Open Food Facts / ODbL 1.0)
+
+- In full compliance with the Open Database License (ODbL) 1.0:
+  - All responses referencing Open Food Facts data retain appropriate attribution markers (`source: OPEN_FOOD_FACTS`, `license: ODbL 1.0`).
+  - Mobile product detail sheets prominently display: _"Data sourced from Open Food Facts under Open Database License (ODbL) 1.0."_
+  - Any local enhancements to Open Food Facts database records remain compliant with ODbL share-alike provisions.

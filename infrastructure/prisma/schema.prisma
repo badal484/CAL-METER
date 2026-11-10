@@ -249,6 +249,12 @@ model FoodItem {
   fat                 Decimal                 @db.Decimal(8, 2)
   fiber               Decimal                 @default(0.00) @db.Decimal(8, 2)
   micronutrients      Json                    @default("{}")
+  imageUrl            String?                 @map("image_url") @db.VarChar(500)
+  manufacturer        String?                 @db.VarChar(255)
+  ingredientsText     String?                 @map("ingredients_text") @db.Text
+  allergens           String[]                @default([])
+  countries           String[]                @default([])
+  netWeightGrams      Decimal?                @map("net_weight_grams") @db.Decimal(8, 2)
   categoryId          String?                 @map("category_id") @db.Uuid
   dataSourceId        String?                 @map("data_source_id") @db.Uuid
   importBatchId       String?                 @map("import_batch_id") @db.Uuid
@@ -264,6 +270,7 @@ model FoodItem {
   nutrientProfile     FoodNutrientProfile?
   servingConversions  ServingUnitConversion[]
   aliases             FoodAlias[]
+  barcodes            FoodBarcode[]
   mealFoodItems       MealFoodItem[]
   recipeIngredients   FoodIngredient[]        @relation("ParentRecipe")
   usedAsIngredientIn  FoodIngredient[]        @relation("IngredientItem")
@@ -338,6 +345,21 @@ model FoodAlias {
   @@unique([foodItemId, alias])
   @@index([alias])
   @@map("food_aliases")
+}
+
+model FoodBarcode {
+  id         String   @id @default(uuid()) @db.Uuid
+  foodItemId String   @map("food_item_id") @db.Uuid
+  barcode    String   @unique @db.VarChar(64)
+  format     String?  @db.VarChar(32)
+  country    String?  @db.VarChar(10)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+
+  @@index([barcode])
+  @@index([foodItemId])
+  @@map("food_barcodes")
 }
 
 model FoodIngredient {

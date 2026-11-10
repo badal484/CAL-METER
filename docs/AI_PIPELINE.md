@@ -268,3 +268,38 @@ _Note: Latency and throughput figures represent unverified engineering design ta
 | **Database Match & Response** | Target: < 150 ms          | Trigram indexes and in-memory Redis catalog lookups.                |
 | **Total End-to-End Latency**  | **Target: < 2.5 seconds** | Unverified target for responsive user feel.                         |
 | **Cost Per Scan Target**      | **Target: < $0.002 USD**  | Model token economy optimization and prompt efficiency.             |
+
+---
+
+## 10. Hybrid Multi-Modal & Barcode Recognition Architecture
+
+For packaged food products, relying solely on multimodal vision LLMs is suboptimal: barcode symbologies can be parsed deterministically on the client device with **zero AI inference latency** and **zero token cost**.
+
+CAL METER implements a **Hybrid Visual-Barcode Routing Pipeline**:
+
+```mermaid
+flowchart TD
+    Scanner[User Opens Scanner] --> ModeChoice{Capture Mode}
+    ModeChoice -->|Barcode Mode| NativeCamera[Client Camera ML: On-Device Barcode Decoder]
+    ModeChoice -->|Food Photo AI| VisualPipe[Multimodal Vision Pipeline]
+
+    NativeCamera --> BarcodeDecoded[EAN-13 / UPC-A / UPC-E / Code 128]
+    BarcodeDecoded --> ChecksumCheck{GS1 Modulo-10 Valid?}
+    ChecksumCheck -- No --> RejectCode[Reject with Format Warning]
+    ChecksumCheck -- Yes --> BackendLookup[GET /foods/barcode/:barcode]
+
+    BackendLookup --> InternalDB{Found in PostgreSQL / Cache?}
+    InternalDB -- Yes --> ReturnProduct[Instant Product DTO]
+    InternalDB -- No --> OFFQuery[Query Open Food Facts API]
+    OFFQuery -- Found --> PersistAndReturn[Atomically Persist to DB & Return]
+    OFFQuery -- Not Found --> FallbackOCR[Offer Nutrition Label OCR or Manual Entry]
+
+    VisualPipe --> DecoupledMatch[Decoupled Intelligence Matching Engine]
+```
+
+### Advantages of the Hybrid Pipeline:
+
+1. **Zero LLM Hallucinations:** Packaged nutrition is retrieved from manufacturer-reported or certified crowd-sourced datasets.
+2. **Sub-second Resolution:** On-device hardware-accelerated symbology decoding executes in < 30ms.
+3. **Bandwidth Minimization:** Zero camera frames are uploaded to the cloud during barcode scanning; only the decoded numeric string is transmitted.
+4. **Deterministic Micronutrient Rigor:** Exact vitamin, mineral, and allergen records are preserved without probabilistic approximation.

@@ -8,12 +8,17 @@ import { createRootRouter } from './routes/index.js';
 import type { IFirebaseTokenVerifier } from './lib/firebase.js';
 import { getConfig, type ParsedTrustProxy } from './config/env.js';
 
+import type { Router } from 'express';
+import type { BarcodeLookupService } from './services/barcode/barcodeLookup.service.js';
+
 export interface CreateAppOptions {
   verifier?: IFirebaseTokenVerifier;
   customVerifier?: IFirebaseTokenVerifier;
   prisma?: PrismaClient;
   trustProxy?: ParsedTrustProxy;
   configureRoutes?: (app: Express) => void;
+  barcodeService?: BarcodeLookupService;
+  foodRouter?: Router;
 }
 
 export function createApp(options?: CreateAppOptions): Express {
@@ -40,7 +45,12 @@ export function createApp(options?: CreateAppOptions): Express {
 
   // Application Routes with injected dependencies
   const verifier = options?.verifier ?? options?.customVerifier;
-  const router = createRootRouter({ verifier, prisma: options?.prisma });
+  const router = createRootRouter({
+    verifier,
+    prisma: options?.prisma,
+    foodRouter: options?.foodRouter,
+    barcodeService: options?.barcodeService,
+  });
   app.use('/', router);
 
   // Optional custom test routes hook before error handlers

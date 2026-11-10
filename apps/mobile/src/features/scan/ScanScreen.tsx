@@ -1,29 +1,272 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { ScreenContainer, Card, SectionHeader, Button } from '../../components';
 import { useTheme } from '../../app/providers/ThemeProvider';
-import { Camera, Barcode, FileText, Info } from 'lucide-react-native';
+import { Camera, Barcode, FileText, Info, CameraOff } from 'lucide-react-native';
+import { defaultBarcodeApiClient, BarcodeApiClient } from '../../services/barcodeApi';
+import { defaultDiaryApiClient, DiaryApiClient } from '../../services/diaryApi';
+import { checkCameraPermission, requestCameraPermission } from './permissions';
+import { BarcodeScannerView } from './components/BarcodeScannerView';
+import { ManualBarcodeModal } from './components/ManualBarcodeModal';
+import { ProductDetailSheet } from './components/ProductDetailSheet';
+import type { PackagedProductDto } from '@calmeter/contracts';
+import { formatDateToIso, MealType, LoggedMethod } from '@calmeter/shared';
 
-export const ScanScreen: React.FC = () => {
+export interface ScanScreenProps {
+  barcodeApiClient?: BarcodeApiClient;
+  diaryApiClient?: DiaryApiClient;
+  initialMode?: 'menu' | 'barcode' | 'permission_denied';
+}
+
+export const ScanScreen: React.FC<ScanScreenProps> = ({
+  barcodeApiClient = defaultBarcodeApiClient,
+  diaryApiClient = defaultDiaryApiClient,
+  initialMode = 'menu',
+}) => {
   const { theme } = useTheme();
   const { colors, typography, spacing, radii } = theme;
 
-  const handleScanModePress = (title: string) => {
-    Alert.alert(
-      `${title} Preview`,
-      `${title} camera capture and AI recognition pipeline are scheduled for Milestones 4 & 7. Camera permissions are not requested in this foundation build.`,
-      [{ text: 'OK' }],
-    );
+  const [activeView, setActiveView] = useState<'menu' | 'barcode' | 'permission_denied'>(
+    initialMode,
+  );
+  const [manualModalVisible, setManualModalVisible] = useState(false);
+  const [productSheetVisible, setProductSheetVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<PackagedProductDto | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Activate Barcode Scanner mode with permission verification
+  const handleLaunchBarcodeScanner = async () => {
+    setErrorMessage(null);
+    const hasPermission = await checkCameraPermission();
+    if (hasPermission) {
+      setActiveView('barcode');
+      return;
+    }
+
+    const granted = await requestCameraPermission();
+    if (granted) {
+      setActiveView('barcode');
+    } else {
+      setActiveView('permission_denied');
+    }
   };
 
-  const handleManualSearchPress = () => {
-    Alert.alert(
-      'Manual Search Preview',
-      'Food database search and USDA/Open Food Facts integration will be connected in Milestone 7.',
-      [{ text: 'OK' }],
-    );
+  const handleModePress = (modeId: string, title: string) => {
+    if (modeId === 'barcode') {
+      handleLaunchBarcodeScanner();
+    } else {
+      Alert.alert(
+        `${title} Preview`,
+        `${title} camera capture and AI recognition pipeline are scheduled for Milestones 4 & 7. Camera permissions are not requested in this foundation build.`,
+        [{ text: 'OK' }],
+      );
+    }
   };
 
+  // Perform barcode lookup (from camera scan or manual modal)
+  const performBarcodeLookup = async (barcode: string) => {
+    setIsProcessing(true);
+    setErrorMessage(null);
+    try {
+      const product = await barcodeApiClient.lookupBarcode(barcode);
+      setSelectedProduct(product);
+      setManualModalVisible(false);
+      setProductSheetVisible(true);
+    } catch (err: any) {
+      const message =
+        err?.message ||
+        `Product with barcode "${barcode}" was not found in catalog or Open Food Facts.`;
+      setErrorMessage(message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Add recognized packaged food item to user's daily diary
+  const handleAddToDiary = async ({
+    foodItemId,
+    foodName,
+    mealType,
+    servingSizeGrams,
+    portionAmount,
+    servingUnit,
+    calories,
+    protein,
+    carbs,
+    fat,
+    fiber,
+    sugar,
+    sodium,
+    loggedMethod,
+  }: {
+    foodItemId: string;
+    foodName: string;
+    mealType: MealType;
+    servingSizeGrams: number;
+    portionAmount: number;
+    servingUnit: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number | null;
+    sugar: number | null;
+    sodium: number | null;
+    loggedMethod: LoggedMethod;
+  }) => {
+    const todayIso = formatDateToIso(new Date());
+    await diaryApiClient.createDiaryEntry({
+      date: todayIso,
+      mealType,
+      items: [
+        {
+          foodItemId,
+          foodName,
+          portionAmount,
+          servingUnit,
+          gramWeight: servingSizeGrams * portionAmount,
+          calories,
+          protein,
+          carbs,
+          fat,
+          fiber,
+          sugar,
+          sodium,
+          loggedMethod,
+        },
+      ],
+    });
+  };
+
+  // 1. ACTIVE CAMERA SCANNER VIEW
+  if (activeView === 'barcode') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000000' }}>
+        <BarcodeScannerView
+          onScan={performBarcodeLookup}
+          onOpenManual={() => setManualModalVisible(true)}
+          onClose={() => setActiveView('menu')}
+          isProcessing={isProcessing}
+          error={errorMessage}
+          onClearError={() => setErrorMessage(null)}
+        />
+
+        {/* Manual Barcode Entry Modal */}
+        <ManualBarcodeModal
+          visible={manualModalVisible}
+          loading={isProcessing}
+          onClose={() => setManualModalVisible(false)}
+          onSubmit={performBarcodeLookup}
+        />
+
+        {/* Packaged Product Details Bottom Sheet */}
+        <ProductDetailSheet
+          visible={productSheetVisible}
+          product={selectedProduct}
+          onClose={() => {
+            setProductSheetVisible(false);
+            setSelectedProduct(null);
+          }}
+          onAddToDiary={handleAddToDiary}
+        />
+      </View>
+    );
+  }
+
+  // 2. CAMERA PERMISSION DENIED VIEW
+  if (activeView === 'permission_denied') {
+    return (
+      <ScreenContainer>
+        <View style={[styles.deniedContainer, { padding: spacing.xl }]}>
+          <View
+            style={[
+              styles.deniedIconBox,
+              {
+                backgroundColor: colors.surfaceMuted,
+                borderRadius: radii.full,
+                padding: spacing.lg,
+                marginBottom: spacing.lg,
+              },
+            ]}
+          >
+            <CameraOff size={48} color={colors.textPrimary} />
+          </View>
+
+          <Text
+            style={[typography.titleMedium, { color: colors.textPrimary, textAlign: 'center' }]}
+          >
+            Camera Access Required
+          </Text>
+
+          <Text
+            style={[
+              typography.bodyMedium,
+              {
+                color: colors.textSecondary,
+                textAlign: 'center',
+                marginTop: spacing.sm,
+                marginBottom: spacing.xl,
+              },
+            ]}
+          >
+            CAL METER requires camera permissions to scan barcodes on food packages. You can grant
+            access or enter barcode digits manually.
+          </Text>
+
+          <View style={{ width: '100%', marginBottom: spacing.md }}>
+            <Button
+              title="Grant Camera Access"
+              onPress={handleLaunchBarcodeScanner}
+              accessibilityLabel="Request camera access again"
+            />
+          </View>
+
+          <View style={{ width: '100%', marginBottom: spacing.md }}>
+            <Button
+              title="Enter Barcode Manually"
+              variant="outline"
+              leftIcon={<Barcode size={18} color={colors.textPrimary} />}
+              onPress={() => setManualModalVisible(true)}
+              accessibilityLabel="Enter barcode manually"
+            />
+          </View>
+
+          <View style={{ width: '100%' }}>
+            <Button
+              title="Back to Capture Modes"
+              variant="ghost"
+              onPress={() => setActiveView('menu')}
+              accessibilityLabel="Return to capture mode list"
+            />
+          </View>
+        </View>
+
+        {/* Manual Barcode Entry Modal */}
+        <ManualBarcodeModal
+          visible={manualModalVisible}
+          loading={isProcessing}
+          onClose={() => setManualModalVisible(false)}
+          onSubmit={async barcode => {
+            await performBarcodeLookup(barcode);
+          }}
+        />
+
+        {/* Packaged Product Details Bottom Sheet */}
+        <ProductDetailSheet
+          visible={productSheetVisible}
+          product={selectedProduct}
+          onClose={() => {
+            setProductSheetVisible(false);
+            setSelectedProduct(null);
+          }}
+          onAddToDiary={handleAddToDiary}
+        />
+      </ScreenContainer>
+    );
+  }
+
+  // 3. DEFAULT SCAN MENU VIEW
   const scanModes = [
     {
       id: 'photo',
@@ -78,13 +321,13 @@ export const ScanScreen: React.FC = () => {
         <Info size={20} color={colors.textSecondary} style={{ marginRight: spacing.sm }} />
         <View style={{ flex: 1 }}>
           <Text style={[typography.labelMedium, { color: colors.textPrimary }]}>
-            Milestone Notice
+            Barcode Scanner Available
           </Text>
           <Text
             style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xxs }]}
           >
-            Scanning hardware and AI vision pipeline are scheduled for Milestone 4 & 7. Camera
-            permissions are not requested in this foundation build.
+            Barcode scanning with live Open Food Facts integration is active. Photo AI and Label OCR
+            will arrive in upcoming milestones.
           </Text>
         </View>
       </View>
@@ -96,7 +339,7 @@ export const ScanScreen: React.FC = () => {
         <Card
           key={mode.id}
           style={{ marginBottom: spacing.md }}
-          onPress={() => handleScanModePress(mode.title)}
+          onPress={() => handleModePress(mode.id, mode.title)}
           accessibilityLabel={`${mode.title}: ${mode.description}`}
         >
           <View style={styles.modeCard}>
@@ -148,12 +391,32 @@ export const ScanScreen: React.FC = () => {
       {/* Manual Fallback */}
       <View style={{ marginTop: spacing.lg }}>
         <Button
-          title="Manual Text Search"
-          onPress={handleManualSearchPress}
+          title="Manual Barcode Entry"
+          onPress={() => setManualModalVisible(true)}
           variant="outline"
-          accessibilityHint="Simulates text-based food search"
+          leftIcon={<Barcode size={18} color={colors.textPrimary} />}
+          accessibilityLabel="Open manual barcode search dialog"
         />
       </View>
+
+      {/* Manual Barcode Entry Modal */}
+      <ManualBarcodeModal
+        visible={manualModalVisible}
+        loading={isProcessing}
+        onClose={() => setManualModalVisible(false)}
+        onSubmit={performBarcodeLookup}
+      />
+
+      {/* Packaged Product Details Bottom Sheet */}
+      <ProductDetailSheet
+        visible={productSheetVisible}
+        product={selectedProduct}
+        onClose={() => {
+          setProductSheetVisible(false);
+          setSelectedProduct(null);
+        }}
+        onAddToDiary={handleAddToDiary}
+      />
     </ScreenContainer>
   );
 };
@@ -181,5 +444,14 @@ const styles = StyleSheet.create({
   },
   tagBadge: {
     borderWidth: 1,
+  },
+  deniedContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deniedIconBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

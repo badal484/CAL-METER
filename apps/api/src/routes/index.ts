@@ -6,10 +6,13 @@ import { createFoodRouter } from './food.routes.js';
 import { createScanRouter } from './scan.routes.js';
 import { createDiaryRouter } from './diary.routes.js';
 import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
+import type { BarcodeLookupService } from '../services/barcode/barcodeLookup.service.js';
 
 export interface RouteOptions {
   verifier?: IFirebaseTokenVerifier;
   prisma?: PrismaClient;
+  foodRouter?: Router;
+  barcodeService?: BarcodeLookupService;
 }
 
 export function createRootRouter(options?: RouteOptions): Router {
@@ -23,7 +26,12 @@ export function createRootRouter(options?: RouteOptions): Router {
   v1Router.use('/auth', createAuthRouter(options?.verifier));
   v1Router.use(
     '/foods',
-    createFoodRouter({ verifier: options?.verifier, prisma: options?.prisma }),
+    options?.foodRouter ||
+      createFoodRouter({
+        verifier: options?.verifier,
+        prisma: options?.prisma,
+        barcodeService: options?.barcodeService,
+      }),
   );
   v1Router.use(
     '/scans',

@@ -6,3 +6,4 @@ export * from './foods.contract.js';
 export * from './scans.contract.js';
 export * from './diary.contract.js';
 export * from './tracking.contract.js';
+export * from './barcode.contract.js';

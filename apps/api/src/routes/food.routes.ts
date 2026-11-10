@@ -5,6 +5,8 @@ import {
   FoodSearchQuerySchema,
   CreateCustomFoodSchema,
   UpdateCustomFoodSchema,
+  BarcodeParamSchema,
+  ManualBarcodeLookupRequestSchema,
   UuidSchema,
   type FoodSearchQuery,
   type CreateCustomFoodDto,
@@ -17,6 +19,7 @@ import type { IFirebaseTokenVerifier } from '../lib/firebase.js';
 import { getFirebaseTokenVerifier } from '../lib/firebase.js';
 import { FoodSearchService } from '../services/foodSearch.service.js';
 import { FoodManagementService } from '../services/foodManagement.service.js';
+import { BarcodeLookupService } from '../services/barcode/barcodeLookup.service.js';
 import { resolveUserId } from '../lib/userResolver.js';
 
 const IdParamSchema = z.object({
@@ -26,6 +29,7 @@ const IdParamSchema = z.object({
 export interface FoodRouterOptions {
   prisma?: PrismaClient;
   verifier?: IFirebaseTokenVerifier;
+  barcodeService?: BarcodeLookupService;
 }
 
 export function createFoodRouter(options?: FoodRouterOptions): Router {
@@ -36,6 +40,7 @@ export function createFoodRouter(options?: FoodRouterOptions): Router {
 
   const searchService = new FoodSearchService(prisma);
   const managementService = new FoodManagementService(prisma);
+  const barcodeService = options?.barcodeService || new BarcodeLookupService({ prisma });
 
   /**
    * Helper middleware: optionally verifies Bearer token if provided,
@@ -118,6 +123,64 @@ export function createFoodRouter(options?: FoodRouterOptions): Router {
         res.status(201).json({
           success: true,
           data: created,
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * GET /foods/barcode/:barcode
+   * Resolves a packaged food product by barcode using internal DB and external providers.
+   */
+  router.get(
+    '/barcode/:barcode',
+    optionalAuth,
+    validateParams(BarcodeParamSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { barcode } = req.params as { barcode: string };
+        let resolvedUserUuid: string | undefined;
+
+        if (req.user) {
+          resolvedUserUuid = await resolveUserId(prisma, req.user);
+        }
+
+        const product = await barcodeService.lookup(barcode, resolvedUserUuid);
+
+        res.status(200).json({
+          success: true,
+          data: product,
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * POST /foods/barcode/lookup
+   * Manual barcode lookup endpoint with JSON body.
+   */
+  router.post(
+    '/barcode/lookup',
+    optionalAuth,
+    validateBody(ManualBarcodeLookupRequestSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { barcode } = req.body as { barcode: string };
+        let resolvedUserUuid: string | undefined;
+
+        if (req.user) {
+          resolvedUserUuid = await resolveUserId(prisma, req.user);
+        }
+
+        const product = await barcodeService.lookup(barcode, resolvedUserUuid);
+
+        res.status(200).json({
+          success: true,
+          data: product,
         });
       } catch (err) {
         next(err);

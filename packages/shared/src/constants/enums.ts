@@ -99,3 +99,20 @@ export enum ServingProvenance {
   USER_CONFIGURED = 'USER_CONFIGURED',
   ESTIMATED_HOUSEHOLD = 'ESTIMATED_HOUSEHOLD',
 }
+
+export enum BarcodeFormat {
+  EAN_13 = 'EAN_13',
+  EAN_8 = 'EAN_8',
+  UPC_A = 'UPC_A',
+  UPC_E = 'UPC_E',
+  CODE_128 = 'CODE_128',
+  QR_CODE = 'QR_CODE',
+  OTHER = 'OTHER',
+}
+
+export enum DataQuality {
+  VERIFIED = 'VERIFIED',
+  EXTERNAL_SOURCE = 'EXTERNAL_SOURCE',
+  USER_ENTERED = 'USER_ENTERED',
+  INCOMPLETE = 'INCOMPLETE',
+}

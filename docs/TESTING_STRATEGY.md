@@ -87,16 +87,35 @@ describe('Nutrition Math Engine', () => {
     - Payload validation guards (invalid date formats, non-positive portions).
     - Direct manual logging without `foodItemId` using custom nutritional values.
     - Atomic transaction rollback on failure.
+  - **Barcode Scanning & Packaged Food Recognition Subsystem (`apps/api/tests/barcodeLookup.test.ts`):**
+    - Input barcode sanitation (stripping spaces, hyphens, and leading zero noise).
+    - Strict GS1 Modulo-10 checksum validation (rejecting malformed check digits with 400).
+    - Zero-suppressed UPC-E expansion to full 12-digit UPC-A formats.
+    - Fast-path lookup against internal PostgreSQL catalog (`food_barcodes` and `food_items`).
+    - Fallback querying of external Open Food Facts API with resilient error handling:
+      - 504 Gateway Timeout simulation on request abort / latency exceed.
+      - 429 Too Many Requests propagation on upstream rate limits.
+      - 503 Service Unavailable handling on upstream outages.
+      - 404 Product Not Found for non-existent items.
+    - Atomic persistence of newly resolved external products into local PostgreSQL database (`food_items`, `food_barcodes`, `food_nutrient_profiles`, `serving_unit_conversions`).
+    - Strict preservation of `null` vs `0` for unmeasured micronutrients across providers.
+    - Multi-tenant custom food isolation: custom foods bound to barcodes are strictly hidden from other tenants (`404 Not Found`).
 
-### 2.3. Mobile Component & Workflow Testing (`apps/mobile/tests/diary.test.tsx`)
+### 2.3. Mobile Component & Workflow Testing (`apps/mobile/tests/`)
 
 - **Test Runner:** Vitest + React Test Renderer with full design system mock environment.
-- **Scope:**
+- **Diary Screen Suite (`apps/mobile/tests/diary.test.tsx`):**
   - Initial loading skeleton/spinner followed by daily summary card hydration.
   - All four canonical meal sections (Breakfast, Lunch, Dinner, Snacks) rendered with food item rows and empty state placeholders.
   - Calendar date navigation (Next day, Previous day, Jump to Today shortcut).
   - Item deletion flow with confirmation dialog and automatic summary refresh.
   - API failure error state rendering with accessible retry action.
+- **Barcode Scanner Suite (`apps/mobile/tests/barcodeScanner.test.tsx`):**
+  - Menu rendering with capture modes and manual entry fallback button.
+  - Camera permission lifecycle: denial state renders informative screen with manual fallback; granted state mounts active scanner view.
+  - Real-time manual barcode modal validation: detects EAN-13, EAN-8, UPC-A, UPC-E; validates check digit; disables search on invalid checksums; enables search on valid inputs.
+  - Scanner camera integration: triggers API lookup on read; throttles and debounces duplicate frames; presents loading indicator and error alerts.
+  - Product detail sheet: renders brand, manufacturer, ingredients, allergens; switches portion units (per serving vs per 100g); adjusts quantity steppers; dynamically recalculates live nutrition; strictly preserves `null` values; displays Open Food Facts ODbL attribution notice; commits to diary with `LoggedMethod.BARCODE`.
 
 ### 2.4. End-to-End (E2E) Testing (Maestro & Detox)
 

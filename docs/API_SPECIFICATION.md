@@ -498,6 +498,94 @@ Searches verified reference foods, regional recipes, and user custom foods using
 }
 ```
 
+#### `GET /foods/barcode/:barcode`
+
+Looks up a packaged product by its barcode string (EAN-13, EAN-8, UPC-A, UPC-E, or Code 128). Automatically normalizes whitespace and punctuation, validates the GS1 Modulo-10 checksum, expands UPC-E, queries the local PostgreSQL catalog, falls back to Open Food Facts, and atomically caches results.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:**
+  - `barcode` (string, required): Clean or unnormalized barcode value (1 to 64 chars).
+- **Validation:**
+  - Validates checksum using GS1 Modulo-10 rules.
+  - Returns `400 Bad Request` if invalid check digit or unsupported symbology.
+- **Data Quality & Attribution:**
+  - Explicit `dataQuality` indicator (`VERIFIED`, `EXTERNAL_SOURCE`, `USER_ENTERED`).
+  - Open Food Facts items include attribution and license (`ODbL 1.0`).
+  - Strict preservation of `null` vs `0` for unmeasured micronutrients.
+- **Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "f8d38b69-8f4b-4f76-805c-5dc9dc98f822",
+    "barcode": "8901030825484",
+    "additionalBarcodes": [],
+    "name": "Knorr Classic Mixed Vegetable Soup",
+    "brand": "Knorr",
+    "manufacturer": "Hindustan Unilever Ltd",
+    "imageUrl": "https://images.openfoodfacts.org/images/products/890/103/082/5484/front_en.jpg",
+    "categories": ["Soups", "Packaged Foods"],
+    "countries": ["India"],
+    "ingredientsText": "Dehydrated vegetables, corn starch, salt, spices.",
+    "allergens": ["Gluten", "Celery"],
+    "servingSize": 50.0,
+    "servingUnit": "packet",
+    "standardWeightGrams": 100.0,
+    "netWeightGrams": 50.0,
+    "isLiquid": false,
+    "nutrientsPer100g": {
+      "calories": 320.0,
+      "protein": 7.5,
+      "carbs": 64.0,
+      "fat": 3.2,
+      "saturatedFat": 1.1,
+      "transFat": 0.0,
+      "fiber": 4.5,
+      "sugar": 12.0,
+      "addedSugar": null,
+      "sodium": 1250.0,
+      "micronutrients": {}
+    },
+    "nutrientsPerServing": {
+      "calories": 160.0,
+      "protein": 3.75,
+      "carbs": 32.0,
+      "fat": 1.6,
+      "saturatedFat": 0.55,
+      "transFat": 0.0,
+      "fiber": 2.25,
+      "sugar": 6.0,
+      "addedSugar": null,
+      "sodium": 625.0,
+      "micronutrients": {}
+    },
+    "servingConversions": [],
+    "source": "OPEN_FOOD_FACTS",
+    "attribution": "Open Food Facts contributors",
+    "license": "ODbL 1.0",
+    "isVerified": true,
+    "dataQuality": "EXTERNAL_SOURCE",
+    "missingNutrients": ["addedSugar", "cholesterol", "vitaminD"]
+  }
+}
+```
+
+#### `POST /foods/barcode/lookup`
+
+Manually looks up a barcode via JSON request body for environments where URL path encoding is restricted or complex search metadata is supplied.
+
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+- **Request Body:**
+
+```json
+{
+  "barcode": "8901030825484"
+}
+```
+
+- **Response `200 OK`:** Same schema as `GET /foods/barcode/:barcode`.
+
 #### `GET /foods/:id`
 
 Retrieves complete nutritional and recipe details for a specific food item, including its full micronutrient profile, serving conversions, recipe ingredients, and aliases.

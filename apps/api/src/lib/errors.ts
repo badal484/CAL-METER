@@ -51,6 +51,18 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class ProductNotFoundError extends AppError {
+  constructor(message = 'No packaged product found matching the requested barcode.') {
+    super(message, 404, 'PRODUCT_NOT_FOUND');
+  }
+}
+
+export class ProviderTimeoutError extends AppError {
+  constructor(message = 'Upstream product data provider timed out.') {
+    super(message, 504, 'PROVIDER_TIMEOUT');
+  }
+}
+
 export class DailyScanLimitReachedError extends AppError {
   constructor(message = 'Daily free AI food scan limit reached (maximum 3 scans per day).') {
     super(message, 429, 'DAILY_SCAN_LIMIT_REACHED');
